@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from backend.routers.ingest import router as ingest_router
 from backend.routers.analyze import router as analyze_router
+from backend.routers.datasets import router as datasets_router
 from contextlib import asynccontextmanager
 import logging
 from backend.database.mongodb import mongodb_conn
@@ -18,14 +19,10 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("Starting up the application...")
     try:
-        # Allow skipping DB connects in test mode
-        import os
-        if os.environ.get('SKIP_DB') != '1':
-            await mongodb_conn.connect()
-            await redis_conn.connect()
-            logger.info("Database connections established successfully")
-        else:
-            logger.info("SKIP_DB set — skipping DB connects for testing")
+        # Always skip DB connection for local testing without docker
+        # await mongodb_conn.connect()
+        # await redis_conn.connect()
+        logger.info("Database connections skipped for text pivot testing")
     except Exception as e:
         logger.error(f"Failed to establish database connections: {e}")
         raise
@@ -34,9 +31,9 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     logger.info("Shutting down the application...")
-    await redis_conn.close()
-    await mongodb_conn.close()
-    logger.info("Database connections closed")
+    # await redis_conn.close()
+    # await mongodb_conn.close()
+    logger.info("Application closed")
 
 app = FastAPI(
     title="AI Fraud Detection API",
@@ -57,6 +54,7 @@ app.add_middleware(
 # Include routers
 app.include_router(ingest_router)
 app.include_router(analyze_router)
+app.include_router(datasets_router)
 
 @app.get("/")
 async def root():

@@ -54,6 +54,22 @@ class TextAnalyzeRequest(BaseModel):
         max_length=MAX_TEXT_LENGTH,
         description="The text message to analyze"
     )
+    # Text specific signals (15 features)
+    urgency_deadline: bool = Field(False, description="Detects fabricated deadlines or false urgency.")
+    financial_lure: bool = Field(False, description="Detects lottery, prize, or unlikely financial reward lures.")
+    impersonation: bool = Field(False, description="Detects spoofing of authority figures, brands, or executives.")
+    credential_theft: bool = Field(False, description="Detects direct requests for passwords, OTPs, or PII.")
+    suspicious_url: bool = Field(False, description="Detects obfuscated, deceptive, or malicious URLs within text.")
+    ai_generated_tone: bool = Field(False, description="Detects hyper-formal, repetitive, or anomalous AI-generated phrasing.")
+    spelling_grammar_forensics: bool = Field(False, description="Detects intentional spelling errors used to bypass basic spam filters.")
+    social_engineering: bool = Field(False, description="Detects psychological manipulation strategies (fear, greed, trust).")
+    crypto_pitch: bool = Field(False, description="Detects 'get-rich-quick' crypto investment or mining schemes.")
+    threat_extortion: bool = Field(False, description="Detects blackmail, sextortion, or legal threats.")
+    job_scam: bool = Field(False, description="Detects fake employment offers requiring upfront payment.")
+    spam_marketing: bool = Field(False, description="Detects unsolicited bulk marketing spam.")
+    regional_upi_fraud: bool = Field(False, description="Detects localized payment system, UPI, or cashapp scams.")
+    romance_scam: bool = Field(False, description="Detects fabricated relationships aiming for financial exploitation.")
+    tech_support_refund: bool = Field(False, description="Detects fake tech support or overpayment refund scams.")
     user_id: Optional[str] = Field(
         None, 
         description="Optional user ID for logging"
@@ -69,6 +85,11 @@ class TextAnalyzeRequest(BaseModel):
             raise ValueError('Text cannot be empty or whitespace only')
         return v.strip()
 
+
+class TextErrorAnalysis(BaseModel):
+    typos: List[str]
+    grammar_issues: List[str]
+    score: int
 
 class LinkIntelligence(BaseModel):
     domain_age_days: int
@@ -86,6 +107,7 @@ class TextAnalyzeResponse(BaseModel):
     why_fraud: List[str]
     detected_signals: Dict[str, bool]
     link_intelligence: Optional[LinkIntelligence]
+    text_error_analysis: Optional[TextErrorAnalysis] = None
     recommended_action: List[str]
     confidence: float
     processing_time: float
@@ -145,7 +167,7 @@ async def analyze_text(
         text = sanitize_text(payload.text)
         
         # Import classifier
-        from ai_modules.text_classifier import TextClassifier
+        from backend.ai_modules.text_classifier import TextClassifier
         
         # Initialize and classify
         # V2: No arguments needed for init
