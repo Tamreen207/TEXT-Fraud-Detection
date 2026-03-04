@@ -5,6 +5,7 @@ Provides /analyze endpoint for AI text classification
 
 import asyncio
 import logging
+import re
 import time
 from typing import Dict, Any, Optional, List, Union
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -202,6 +203,3 @@ async def clear_analysis_log():
     global _ANALYSIS_LOG
     _ANALYSIS_LOG = []
     return {"status": "cleared", "count": 0}
-
-
-import re  # Import for sanitization function

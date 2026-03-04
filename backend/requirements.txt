@@ -1,11 +1,67 @@
 # Backend dependencies for FastAPI
+# Core Web Framework
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+
+# Data Validation
 pydantic==2.5.0
+
+# Database
 motor==3.3.2
 redis==5.0.1
+
+# Environment & File Handling
 python-dotenv==1.0.0
 python-multipart==0.0.6
 aiofiles==23.2.1
+
+# Rate Limiting
 slowapi==0.1.9
-# Add other dependencies as needed
+
+# Additional useful modules
+# For text processing and NLP
+nltk==3.8.1
+textblob==0.17.1
+
+# For HTTP requests
+httpx==0.25.2
+requests==2.31.0
+
+# For async operations
+aiohttp==3.9.1
+
+# For date/time handling
+python-dateutil==2.8.2
+
+# For logging
+loguru==0.7.2
+
+# For CORS
+starlette==0.27.0
+
+# For database connection pooling
+SQLAlchemy==2.0.23
+
+# For password hashing (security)
+bcrypt==4.1.2
+
+# For JWT tokens
+PyJWT==2.8.0
+
+# For email validation
+email-validator==2.1.0
+
+# For URL parsing and validation
+tldextract==5.1.1
+
+# For image processing (if needed)
+Pillow==10.1.0
+
+# For OCR (if needed)
+pytesseract==0.3.10
+
+# For BeautifulSoup (HTML parsing)
+beautifulsoup4==4.12.2
+
+# For lxml (XML/HTML parsing)
+lxml==5.1.0
