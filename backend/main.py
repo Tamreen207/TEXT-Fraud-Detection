@@ -6,8 +6,8 @@ from backend.routers.analyze import router as analyze_router
 from backend.routers.datasets import router as datasets_router
 from contextlib import asynccontextmanager
 import logging
-from backend.database.mongodb import mongodb_conn
-from backend.database.redis import redis_conn
+from backend.ai_modules.database.mongodb import mongodb_conn
+from backend.ai_modules.database.redis import redis_conn
 # Note: simple in-app rate limiting implemented in router for demo
 
 # Configure logging

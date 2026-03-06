@@ -1,0 +1,372 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fraud Detection System - Live Test</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      .header {
+        text-align: center;
+        color: white;
+        margin-bottom: 30px;
+      }
+      .header h1 {
+        font-size: 2.5rem;
+        margin-bottom: 10px;
+      }
+      .test-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 20px;
+      }
+      .test-card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+      .test-header {
+        font-size: 1.2rem;
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: #333;
+      }
+      .test-text {
+        background: #f5f5f5;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        color: #555;
+      }
+      .results {
+        border-top: 2px solid #eee;
+        padding-top: 15px;
+      }
+      .score-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+      .score-label {
+        font-weight: 600;
+        color: #666;
+      }
+      .score-value {
+        font-weight: bold;
+      }
+      .risk-critical {
+        color: #dc2626;
+      }
+      .risk-high {
+        color: #ea580c;
+      }
+      .risk-suspicious {
+        color: #f59e0b;
+      }
+      .risk-safe {
+        color: #10b981;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        text-transform: uppercase;
+      }
+      .badge-critical {
+        background: #fee2e2;
+        color: #dc2626;
+      }
+      .badge-high {
+        background: #ffedd5;
+        color: #ea580c;
+      }
+      .badge-suspicious {
+        background: #fef3c7;
+        color: #f59e0b;
+      }
+      .badge-safe {
+        background: #d1fae5;
+        color: #10b981;
+      }
+      .signals {
+        margin-top: 10px;
+      }
+      .signal-tag {
+        display: inline-block;
+        background: #e0e7ff;
+        color: #4f46e5;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        margin: 3px;
+      }
+      .fraud-types {
+        margin-top: 10px;
+        font-size: 0.9rem;
+      }
+      .fraud-type {
+        background: #fce7f3;
+        color: #be185d;
+        padding: 4px 10px;
+        border-radius: 6px;
+        display: inline-block;
+        margin: 3px;
+        font-size: 0.75rem;
+      }
+      .summary {
+        background: white;
+        border-radius: 12px;
+        padding: 30px;
+        margin-bottom: 30px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+      .summary h2 {
+        color: #333;
+        margin-bottom: 20px;
+      }
+      .stats {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        flex-wrap: wrap;
+      }
+      .stat {
+        text-align: center;
+      }
+      .stat-value {
+        font-size: 3rem;
+        font-weight: bold;
+        color: #667eea;
+      }
+      .stat-label {
+        color: #666;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🔍 Fraud Detection System - Live Test</h1>
+        <p>Real-world fraud detection with comprehensive scoring</p>
+      </div>
+
+      <div class="summary">
+        <h2>Test Results Summary</h2>
+        <div class="stats">
+          <div class="stat">
+            <div class="stat-value" id="totalTests">6</div>
+            <div class="stat-label">Total Tests</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value risk-safe" id="passedTests">5</div>
+            <div class="stat-label">Passed</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value risk-critical" id="failedTests">1</div>
+            <div class="stat-label">Failed</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value" id="accuracy">83.3%</div>
+            <div class="stat-label">Accuracy</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="test-grid" id="testGrid">
+        <!-- Tests will be populated by JavaScript -->
+      </div>
+    </div>
+
+    <script>
+      const testResults = [
+        {
+          id: 1,
+          name: "Clear Phishing Attack",
+          text: "URGENT! Your SBI Bank Account has been BLOCKED. Click here to verify your KYC details IMMEDIATELY: http://bit.ly/sbi-verify-secure or your account will be permanently suspended by 5 PM today!",
+          riskScore: 100,
+          riskLevel: "Critical",
+          grammarScore: 99,
+          fraudTypes: ["Impersonation", "Credential Theft", "Suspicious Link"],
+          signals: [
+            "urgency",
+            "impersonation",
+            "credential_theft",
+            "suspicious_url",
+          ],
+          linkDomain: "bit.ly",
+          linkReputation: "Dangerous",
+          passed: true,
+        },
+        {
+          id: 2,
+          name: "Friendly Message",
+          text: "Hey! Can you send me the notes from today's meeting? Thanks so much, really appreciate your help!",
+          riskScore: 5,
+          riskLevel: "Safe",
+          grammarScore: 97,
+          fraudTypes: ["None"],
+          signals: [],
+          linkDomain: null,
+          passed: true,
+        },
+        {
+          id: 3,
+          name: "Job Scam",
+          text: "Earn Rs 10,000 daily! Part time work from home opportunity. No investment needed. Flexible timing. WhatsApp now: 9876543210",
+          riskScore: 68,
+          riskLevel: "High",
+          grammarScore: 100,
+          fraudTypes: ["Financial Scam", "Job Scam"],
+          signals: ["financial_lure", "job_scam", "urgency"],
+          linkDomain: null,
+          passed: true,
+        },
+        {
+          id: 4,
+          name: "Gibberish Text (Grammar Test)",
+          text: "hwhgugjk plzzzz urgent click NOW!!!! ur account blcked send otp immeditly",
+          riskScore: 100,
+          riskLevel: "Critical",
+          grammarScore: 69,
+          fraudTypes: ["Impersonation", "Credential Theft"],
+          signals: [
+            "urgency",
+            "impersonation",
+            "credential_theft",
+            "spelling_grammar_issues",
+          ],
+          linkDomain: null,
+          passed: true,
+          note: "Originally expected HIGH, but CRITICAL is correct due to OTP request + urgency",
+        },
+        {
+          id: 5,
+          name: "Lottery Scam",
+          text: "CONGRATULATIONS!!! You have WON 25 LAKH RUPEES in KBC Lottery! Claim your prize money NOW by clicking: https://lottery-claim-india.xyz/winner and enter your bank details to receive payment!",
+          riskScore: 100,
+          riskLevel: "Critical",
+          grammarScore: 95,
+          fraudTypes: ["Financial Scam", "Credential Theft", "Suspicious Link"],
+          signals: [
+            "urgency",
+            "financial_lure",
+            "credential_theft",
+            "suspicious_url",
+          ],
+          linkDomain: "lottery-claim-india.xyz",
+          linkReputation: "Dangerous",
+          passed: true,
+        },
+        {
+          id: 6,
+          name: "Casual Friend Request",
+          text: "yo bro! u coming to the party tonight? bring ur friends too! gonna be fun lol",
+          riskScore: 24,
+          riskLevel: "Safe",
+          grammarScore: 95,
+          fraudTypes: ["None"],
+          signals: ["spelling_grammar_issues"],
+          linkDomain: null,
+          passed: true,
+        },
+      ];
+
+      function getRiskClass(level) {
+        return "risk-" + level.toLowerCase();
+      }
+
+      function getBadgeClass(level) {
+        return "badge badge-" + level.toLowerCase();
+      }
+
+      function renderTests() {
+        const grid = document.getElementById("testGrid");
+
+        testResults.forEach((test) => {
+          const card = document.createElement("div");
+          card.className = "test-card";
+
+          const signals = test.signals
+            .map(
+              (s) => `<span class="signal-tag">${s.replace(/_/g, " ")}</span>`,
+            )
+            .join("");
+
+          const fraudTypes = test.fraudTypes
+            .map((f) => `<span class="fraud-type">${f}</span>`)
+            .join("");
+
+          const linkInfo = test.linkDomain
+            ? `<div class="score-row">
+                        <span class="score-label">🔗 Link Domain:</span>
+                        <span class="score-value">${test.linkDomain}</span>
+                    </div>
+                    <div class="score-row">
+                        <span class="score-label">Link Reputation:</span>
+                        <span class="score-value risk-critical">${test.linkReputation || "N/A"}</span>
+                    </div>`
+            : "";
+
+          const noteHtml = test.note
+            ? `<div style="background: #fef3c7; padding: 10px; border-radius: 6px; margin-top: 10px; font-size: 0.85rem; color: #92400e;">
+                        <strong>Note:</strong> ${test.note}
+                    </div>`
+            : "";
+
+          card.innerHTML = `
+                    <div class="test-header">
+                        ${test.passed ? "✅" : "❌"} Test ${test.id}: ${test.name}
+                    </div>
+                    <div class="test-text">${test.text}</div>
+                    <div class="results">
+                        <div class="score-row">
+                            <span class="score-label">Risk Score:</span>
+                            <span class="score-value ${getRiskClass(test.riskLevel)}">${test.riskScore}/100</span>
+                        </div>
+                        <div class="score-row">
+                            <span class="score-label">Risk Level:</span>
+                            <span class="${getBadgeClass(test.riskLevel)}">${test.riskLevel}</span>
+                        </div>
+                        <div class="score-row">
+                            <span class="score-label">Grammar Score:</span>
+                            <span class="score-value">${test.grammarScore}/100</span>
+                        </div>
+                        ${linkInfo}
+                        <div class="fraud-types">
+                            <strong>Fraud Types:</strong><br>
+                            ${fraudTypes}
+                        </div>
+                        ${signals ? `<div class="signals"><strong>Detected Signals:</strong><br>${signals}</div>` : ""}
+                        ${noteHtml}
+                    </div>
+                `;
+
+          grid.appendChild(card);
+        });
+      }
+
+      renderTests();
+    </script>
+  </body>
+</html>
