@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFraudStore } from "@/store/useFraudStore";
 import { analyzeContent } from "@/lib/gemini";
@@ -122,6 +123,14 @@ export default function AnalyzePage() {
           </span>
           .
         </p>
+        <div>
+          <Link
+            href="/analyze/compare?mode=text"
+            className="text-sm text-blue-600 dark:text-blue-400 font-medium hover:underline"
+          >
+            Compare Text Result with Google/Other APIs
+          </Link>
+        </div>
       </div>
 
       {/* Main Content */}
