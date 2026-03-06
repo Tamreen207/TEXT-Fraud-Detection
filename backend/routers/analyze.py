@@ -7,10 +7,10 @@ import asyncio
 import logging
 import re
 import time
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Request
-from pydantic import BaseModel, Field, validator
-from datetime import datetime
+from pydantic import BaseModel, Field, field_validator
+from datetime import datetime, UTC
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,6 @@ class TextAnalyzeRequest(BaseModel):
     job_scam: bool = Field(False, description="Detects fake employment offers requiring upfront payment.")
     spam_marketing: bool = Field(False, description="Detects unsolicited bulk marketing spam.")
     regional_upi_fraud: bool = Field(False, description="Detects localized payment system, UPI, or cashapp scams.")
-    romance_scam: bool = Field(False, description="Detects fabricated relationships aiming for financial exploitation.")
     tech_support_refund: bool = Field(False, description="Detects fake tech support or overpayment refund scams.")
     user_id: Optional[str] = Field(
         None, 
@@ -79,11 +78,12 @@ class TextAnalyzeRequest(BaseModel):
         description="Optional metadata"
     )
     
-    @validator('text')
-    def text_must_be_meaningful(cls, v):
-        if not v.strip():
-            raise ValueError('Text cannot be empty or whitespace only')
-        return v.strip()
+    @field_validator("text")
+    @classmethod
+    def text_must_be_meaningful(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Text cannot be empty or whitespace only")
+        return value.strip()
 
 
 class TextErrorAnalysis(BaseModel):
@@ -114,7 +114,7 @@ class TextAnalyzeResponse(BaseModel):
     recommended_action: List[str]
     confidence: float
     processing_time: float
-    timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    timestamp: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class HealthResponse(BaseModel):
@@ -138,7 +138,7 @@ def sanitize_text(text: str) -> str:
 def log_analysis(request: Dict[str, Any], response: Dict[str, Any]):
     """Log analysis for dataset expansion"""
     log_entry = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "request": {
             "text_length": len(request.get("text", "")),
             "user_id": request.get("user_id"),
@@ -212,7 +212,7 @@ async def analyze_text(
         except Exception as api_err:
             logger.warning(f"API orchestrator error (continuing without): {api_err}")
         
-        response_data["timestamp"] = datetime.utcnow().isoformat()
+        response_data["timestamp"] = datetime.now(UTC).isoformat()
         response_data["processing_time"] = time.time() - start_time
         response_data["api_signals"] = api_signals
         response_data["api_report"] = api_report
