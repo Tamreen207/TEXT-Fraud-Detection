@@ -148,9 +148,125 @@ export default function ComparePage({
             Run New Verification
           </Link>
         </div>
+
+        <div className="pt-4 flex flex-wrap items-center justify-center gap-2">
+          {(["text", "link", "email", "image"] as CompareMode[]).map((tab) => (
+            <Link
+              key={tab}
+              href={`/analyze/compare?mode=${tab}`}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide border transition-colors ${
+                tab === mode
+                  ? "bg-primary/20 text-primary border-primary/40"
+                  : "bg-muted/40 text-muted-foreground border-border hover:bg-muted"
+              }`}
+            >
+              {tab}
+            </Link>
+          ))}
+        </div>
       </div>
 
       <GoogleVerificationPanel mode={mode} />
+
+      {/* Additional Unique Features */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-xl border-2 border-blue-200 dark:border-blue-800 p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse"></div>
+            <p className="text-xs uppercase tracking-wider text-blue-700 dark:text-blue-300 font-bold">
+              Live Threat Intel
+            </p>
+          </div>
+          <p className="font-semibold text-lg text-blue-900 dark:text-blue-100">
+            Real-Time Analysis
+          </p>
+          <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+            Compares with Google's live search patterns to validate fraud
+            signals instantly.
+          </p>
+        </div>
+
+        <div className="rounded-xl border-2 border-purple-200 dark:border-purple-800 p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/30">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full bg-purple-600"></div>
+            <p className="text-xs uppercase tracking-wider text-purple-700 dark:text-purple-300 font-bold">
+              Dual AI Validation
+            </p>
+          </div>
+          <p className="font-semibold text-lg text-purple-900 dark:text-purple-100">
+            Model Consensus
+          </p>
+          <p className="text-sm text-purple-700 dark:text-purple-300 mt-1">
+            FraudGuard + Google Gemini cross-validate results for higher
+            accuracy.
+          </p>
+        </div>
+
+        <div className="rounded-xl border-2 border-green-200 dark:border-green-800 p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full bg-green-600"></div>
+            <p className="text-xs uppercase tracking-wider text-green-700 dark:text-green-300 font-bold">
+              Language Analysis
+            </p>
+          </div>
+          <p className="font-semibold text-lg text-green-900 dark:text-green-100">
+            Scam Pattern ML
+          </p>
+          <p className="text-sm text-green-700 dark:text-green-300 mt-1">
+            Detects urgency, threats, and phishing language patterns
+            automatically.
+          </p>
+        </div>
+
+        <div className="rounded-xl border-2 border-orange-200 dark:border-orange-800 p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/30">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-2 h-2 rounded-full bg-orange-600"></div>
+            <p className="text-xs uppercase tracking-wider text-orange-700 dark:text-orange-300 font-bold">
+              Multi-Modal OCR
+            </p>
+          </div>
+          <p className="font-semibold text-lg text-orange-900 dark:text-orange-100">
+            Image to Text
+          </p>
+          <p className="text-sm text-orange-700 dark:text-orange-300 mt-1">
+            Extracts text from screenshots for fraud analysis with high
+            accuracy.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="rounded-xl border border-border p-4 bg-card">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            Unique Feature 1
+          </p>
+          <p className="font-semibold mt-1">Cross-Modal AI Compare</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Instantly switch Text, Link, Email, and Image verification modes
+            with the same live AI evaluator.
+          </p>
+        </div>
+        <div className="rounded-xl border border-border p-4 bg-card">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            Unique Feature 2
+          </p>
+          <p className="font-semibold mt-1">Consensus Validation Layer</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            FraudGuard verdict is compared with Google AI verdict to reduce
+            one-model bias.
+          </p>
+        </div>
+        <div className="rounded-xl border border-border p-4 bg-card">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">
+            Unique Feature 3
+          </p>
+          <p className="font-semibold mt-1">Evidence-Oriented Highlights</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Every mode includes concrete signal highlights that explain why a
+            sample is safe or risky.
+          </p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative">
         <div className="hidden md:flex absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 bg-background border border-border rounded-full items-center justify-center font-black z-10 shadow-lg">

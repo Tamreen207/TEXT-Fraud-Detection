@@ -13,11 +13,13 @@ import {
   Paperclip,
   Loader2,
   ArrowRight,
-  Search,
+  AlertTriangle,
+  CheckCircle,
+  ShieldAlert,
+  Image as ImageIcon,
 } from "lucide-react";
 import React from "react";
 import { motion } from "framer-motion";
-import Link from "next/link";
 
 export default function DemoHubPage() {
   const router = useRouter();
@@ -73,57 +75,222 @@ export default function DemoHubPage() {
             <span className="text-primary font-bold">FraudGuard</span> with
             real-world fraud examples and live datasets.
           </p>
-          <div className="pt-2">
-            <Link
-              href="https://www.google.com/search?q=latest+fraud+scam+patterns"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold"
-            >
-              <Search className="w-4 h-4" />
-              Compare with Google
-            </Link>
-          </div>
         </motion.div>
 
-        {/* Demo Scenarios Section */}
+        {/* Demo Scenarios Section - Enhanced with All Types */}
         <motion.div variants={item} className="space-y-6">
           <div className="flex items-center gap-3 mb-8">
             <Zap className="w-6 h-6 text-primary" />
             <h2 className="text-3xl font-display font-bold">
-              Try Demo Scenarios
+              Try Demo Scenarios - All Types
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <DemoCard
-              title="Bank Phishing"
-              desc="High-urgency banking alert scam with urgent tone"
-              onClick={() => handleDemo("eval-1")}
-              icon={<Lock className="w-6 h-6 text-danger" />}
-              gradient="from-danger/10 to-red-500/5"
-            />
-            <DemoCard
-              title="Delivery Scam"
-              desc="Fake package delivery with suspicious tracking link"
-              onClick={() => handleDemo("eval-2")}
-              icon={<Zap className="w-6 h-6 text-warning" />}
-              gradient="from-warning/10 to-yellow-500/5"
-            />
-            <DemoCard
-              title="OTP Fraud"
-              desc="Request for sensitive OTP with casual tone"
-              onClick={() => handleDemo("eval-4")}
-              icon={<ShieldCheck className="w-6 h-6 text-purple-500" />}
-              gradient="from-purple-500/10 to-indigo-500/5"
-            />
-            <DemoCard
-              title="Safe Message"
-              desc="See how legitimate messages are handled"
-              onClick={() => handleDemo("eval-5")}
-              icon={<Brain className="w-6 h-6 text-safe" />}
-              gradient="from-safe/10 to-green-500/5"
-            />
+          {/* Text Analysis Demos */}
+          <div className="space-y-4">
+            <h3 className="text-xl font-semibold text-primary flex items-center gap-2">
+              <AlignLeft className="w-5 h-5" />
+              Text Message Analysis
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <DemoCard
+                title="Bank Phishing"
+                desc="High-urgency banking alert scam with urgent tone"
+                onClick={() => handleDemo("eval-1")}
+                icon={<Lock className="w-5 h-5 text-red-500" />}
+                gradient="from-red-500/10 to-red-600/5"
+              />
+              <DemoCard
+                title="Delivery Scam"
+                desc="Fake package delivery with suspicious tracking link"
+                onClick={() => handleDemo("eval-2")}
+                icon={<Zap className="w-5 h-5 text-orange-500" />}
+                gradient="from-orange-500/10 to-yellow-500/5"
+              />
+              <DemoCard
+                title="OTP Fraud"
+                desc="Request for sensitive OTP with casual tone"
+                onClick={() => handleDemo("eval-4")}
+                icon={<ShieldCheck className="w-5 h-5 text-purple-500" />}
+                gradient="from-purple-500/10 to-indigo-500/5"
+              />
+              <DemoCard
+                title="Job Scam"
+                desc="Fake work-from-home job requiring payment"
+                onClick={() => {
+                  useFraudStore
+                    .getState()
+                    .setInputText(
+                      "Congratulations! You've been selected for a high-paying work from home job. Earn ₹50,000/month with no experience! Just pay ₹2,000 registration fee to start immediately. Limited slots!",
+                    );
+                  router.push("/analyze");
+                }}
+                icon={<Mail className="w-5 h-5 text-pink-500" />}
+                gradient="from-pink-500/10 to-rose-500/5"
+              />
+              <DemoCard
+                title="Crypto Scam"
+                desc="Get-rich-quick cryptocurrency investment pitch"
+                onClick={() => {
+                  useFraudStore
+                    .getState()
+                    .setInputText(
+                      "🚀 URGENT! Bitcoin doubling opportunity! Invest ₹10,000 today and get ₹50,000 in 24 hours guaranteed! Our AI trading bot has 99% success rate. Limited time offer!",
+                    );
+                  router.push("/analyze");
+                }}
+                icon={<Lock className="w-5 h-5 text-yellow-500" />}
+                gradient="from-yellow-500/10 to-amber-500/5"
+              />
+              <DemoCard
+                title="Safe Message"
+                desc="Legitimate professional communication"
+                onClick={() => handleDemo("eval-5")}
+                icon={<Brain className="w-5 h-5 text-green-500" />}
+                gradient="from-green-500/10 to-emerald-500/5"
+              />
+            </div>
+          </div>
+
+          {/* Link Analysis Demos */}
+          <div className="space-y-4 pt-8">
+            <h3 className="text-xl font-semibold text-primary flex items-center gap-2">
+              <Paperclip className="w-5 h-5" />
+              Link/URL Analysis
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <DemoCard
+                title="Phishing URL"
+                desc="Suspicious bank login page typosquatting"
+                onClick={() => {
+                  router.push(
+                    `/analyze/link?demoUrl=${encodeURIComponent("https://verify-secure-update.top/login-now")}`,
+                  );
+                }}
+                icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
+                gradient="from-red-500/10 to-red-600/5"
+              />
+              <DemoCard
+                title="Malicious Link"
+                desc="High-risk TLD and suspicious domain"
+                onClick={() => {
+                  router.push(
+                    `/analyze/link?demoUrl=${encodeURIComponent("https://hdfc-secure-verify-account.click/update")}`,
+                  );
+                }}
+                icon={<ShieldAlert className="w-5 h-5 text-orange-500" />}
+                gradient="from-orange-500/10 to-red-500/5"
+              />
+              <DemoCard
+                title="Safe URL"
+                desc="Legitimate website with HTTPS"
+                onClick={() => {
+                  router.push(
+                    `/analyze/link?demoUrl=${encodeURIComponent("https://github.com/microsoft/vscode")}`,
+                  );
+                }}
+                icon={<ShieldCheck className="w-5 h-5 text-green-500" />}
+                gradient="from-green-500/10 to-emerald-500/5"
+              />
+            </div>
+          </div>
+
+          {/* Email Analysis Demos */}
+          <div className="space-y-4 pt-8">
+            <h3 className="text-xl font-semibold text-primary flex items-center gap-2">
+              <Mail className="w-5 h-5" />
+              Email Analysis
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <DemoCard
+                title="Phishing Email"
+                desc="Fake PayPal account verification scam"
+                onClick={() => {
+                  router.push(
+                    `/analyze/email?sender=${encodeURIComponent("security-alert@paypa1-verify.tk")}&subject=${encodeURIComponent("URGENT: Confirm your account now")}&body=${encodeURIComponent("Dear customer, your PayPal account has been limited. Verify your OTP and password now to avoid suspension. Click secure update link immediately.")}`,
+                  );
+                }}
+                icon={<Mail className="w-5 h-5 text-red-500" />}
+                gradient="from-red-500/10 to-red-600/5"
+              />
+              <DemoCard
+                title="Spoofed Sender"
+                desc="Gmail sender claiming to be bank"
+                onClick={() => {
+                  router.push(
+                    `/analyze/email?sender=${encodeURIComponent("hdfc-support-team@gmail.com")}&subject=${encodeURIComponent("Account blocked - verify now")}&body=${encodeURIComponent("Your HDFC account is blocked due to suspicious activity. Verify account details and OTP immediately to restore access.")}`,
+                  );
+                }}
+                icon={<AlertTriangle className="w-5 h-5 text-orange-500" />}
+                gradient="from-orange-500/10 to-yellow-500/5"
+              />
+              <DemoCard
+                title="Legitimate Email"
+                desc="Professional business communication"
+                onClick={() => {
+                  router.push(
+                    `/analyze/email?sender=${encodeURIComponent("hr@company.com")}&subject=${encodeURIComponent("Interview schedule update")}&body=${encodeURIComponent("Hi Alex, your interview is confirmed for Tuesday at 10:30 AM. Please bring your ID and portfolio.")}`,
+                  );
+                }}
+                icon={<CheckCircle className="w-5 h-5 text-green-500" />}
+                gradient="from-green-500/10 to-emerald-500/5"
+              />
+            </div>
+          </div>
+
+          {/* Image Analysis Demos */}
+          <div className="space-y-4 pt-8">
+            <h3 className="text-xl font-semibold text-primary flex items-center gap-2">
+              <ImageIcon className="w-5 h-5" />
+              Image/Screenshot Analysis
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <DemoCard
+                title="Scam Screenshot"
+                desc="Fake bank alert with urgent action required"
+                onClick={() => {
+                  router.push("/analyze/image?demo=scam");
+                }}
+                icon={<ImageIcon className="w-5 h-5 text-red-500" />}
+                gradient="from-red-500/10 to-red-600/5"
+              />
+              <DemoCard
+                title="OTP Request Image"
+                desc="Screenshot asking for verification code"
+                onClick={() => {
+                  router.push("/analyze/image?demo=otp");
+                }}
+                icon={<AlertTriangle className="w-5 h-5 text-orange-500" />}
+                gradient="from-orange-500/10 to-yellow-500/5"
+              />
+              <DemoCard
+                title="Safe Screenshot"
+                desc="Normal team chat or order confirmation"
+                onClick={() => {
+                  router.push("/analyze/image?demo=safe");
+                }}
+                icon={<CheckCircle className="w-5 h-5 text-green-500" />}
+                gradient="from-green-500/10 to-emerald-500/5"
+              />
+              <DemoCard
+                title="Lottery Scam"
+                desc="Fake prize winner notification screenshot"
+                onClick={() => {
+                  router.push("/analyze/image?demo=lottery");
+                }}
+                icon={<ShieldAlert className="w-5 h-5 text-yellow-500" />}
+                gradient="from-yellow-500/10 to-yellow-600/5"
+              />
+              <DemoCard
+                title="Fake Job Offer"
+                desc="Work from home scam with fee request"
+                onClick={() => {
+                  router.push("/analyze/image?demo=job");
+                }}
+                icon={<ImageIcon className="w-5 h-5 text-purple-500" />}
+                gradient="from-purple-500/10 to-purple-600/5"
+              />
+            </div>
           </div>
         </motion.div>
 

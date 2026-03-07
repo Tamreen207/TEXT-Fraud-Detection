@@ -88,6 +88,9 @@ export default function GoogleVerificationPanel({
   const agreement = googleResult
     ? googleResult.googleVerdict === fraudguardVerdict
     : null;
+  const riskDelta = googleResult
+    ? Math.abs(googleResult.googleRiskScore - payload.fraudguard.riskScore)
+    : null;
 
   return (
     <Card className="p-6 border-2 space-y-4">
@@ -150,6 +153,34 @@ export default function GoogleVerificationPanel({
             {agreement
               ? "FraudGuard and Google agree"
               : "FraudGuard and Google differ"}
+          </p>
+          {riskDelta !== null && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Risk Delta: {riskDelta} points •{" "}
+              {riskDelta <= 15
+                ? "Strong consensus"
+                : riskDelta <= 30
+                  ? "Moderate divergence"
+                  : "High divergence"}
+            </p>
+          )}
+        </div>
+      )}
+
+      {googleResult && (
+        <div className="rounded-lg border p-3 bg-muted/10">
+          <p className="text-sm font-semibold">Judge Scorecard</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Decision confidence is highest when both engines agree and risk
+            delta is low.
+          </p>
+          <p className="text-xs mt-2">
+            Suggested action:{" "}
+            {agreement
+              ? googleResult.googleVerdict === "SAFE"
+                ? "Treat as low risk with normal caution."
+                : "Treat as likely fraud and block/escalate."
+              : "Manual review recommended before final verdict."}
           </p>
         </div>
       )}

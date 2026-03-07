@@ -85,6 +85,13 @@ class TextClassifier:
         "please review", "let me know", "team update", "invoice attached"
     }
 
+    TECHNICAL_EDUCATIONAL_TERMS = {
+        "comparison operators", "javascript", "python", "java", "tutorial", "example",
+        "code", "snippet", "compiler", "debug", "programming", "lecture", "course",
+        "boolean", "true", "false", "null", "undefined", "function", "variable",
+        "array", "object", "class", "algorithm", "syntax"
+    }
+
     SAFE_DOMAINS = {
         "google.com", "github.com", "wikipedia.org", "microsoft.com", "apple.com",
         "amazon.com", "paypal.com", "sbi.co.in", "hdfcbank.com", "icicibank.com"
@@ -133,14 +140,33 @@ class TextClassifier:
 
         category_floor = {
             "Phishing Attempt": 70,
+            "Urgent Phishing Attempt": 75,
             "Tech Support Scam": 62,
-            "Job Scam": 48,
+            "Fraudulent Job Offer (Payment Required)": 65,
             "UPI/Payment Fraud": 58,
-            "Extortion Threat": 72,
-            "Crypto Investment Pitch": 55,
-            "Romance Scam": 65,
+            "Extortion/Blackmail Threat": 85,
+            "Crypto Investment Scam": 68,
+            "Romance Scam (Money Request)": 75,
+            "Money Transfer Request": 58,
+            "Credential Harvesting Attempt": 68,
+            "Financial Scam/Prize Notification": 62,
+            "Urgent Impersonation Alert": 65,
+            "Brand/Authority Impersonation": 58,
         }
         total_score = max(total_score, category_floor.get(text_category, 0))
+
+        technical_hits = self._count_matches(text_lower, self.TECHNICAL_EDUCATIONAL_TERMS)
+        high_risk_flags = (
+            signals["credential_theft"]
+            or signals["threat_extortion"]
+            or signals["job_scam"]
+            or signals["romance_fraud"]
+            or (signals["impersonation"] and signals["urgency"])
+        )
+        if technical_hits >= 3 and not high_risk_flags:
+            total_score = max(0, min(total_score, 20))
+            if "Detected educational/technical context (likely benign content)." not in reasons:
+                reasons.append("Detected educational/technical context (likely benign content).")
 
         if grammar["score"] < 45 and not signals["spelling_grammar_issues"]:
             signals["spelling_grammar_issues"] = True
@@ -423,24 +449,86 @@ class TextClassifier:
         return phrase_hits > 0 or near_duplicate_lines
 
     def _detect_text_category(self, text_lower: str, signals: Dict[str, bool]) -> str:
+        # Priority-based detection for more accurate categorization
+        
+        # Critical fraud types first
         if signals["threat_extortion"]:
-            return "Extortion Threat"
-        if signals["romance_fraud"] or (signals["romance_fraud"] and signals["money_transfer_request"]):
-            return "Romance Scam"
+            return "Extortion/Blackmail Threat"
+        
+        # Romance + Money Transfer = Romance Scam
+        if signals["romance_fraud"]:
+            if signals["money_transfer_request"]:
+                return "Romance Scam (Money Request)"
+            return "Suspicious Romance Communication"
+        
+        # Tech support fraud
         if signals["tech_support_refund"]:
             return "Tech Support Scam"
+        
+        # Job scams
         if signals["job_scam"]:
-            return "Job Scam"
+            if signals["financial_lure"]:
+                return "Fraudulent Job Offer (Payment Required)"
+            return "Suspicious Job Opportunity"
+        
+        # Crypto investment schemes
         if signals["crypto_investment_pitch"]:
-            return "Crypto Investment Pitch"
+            if signals["financial_lure"]:
+                return "Crypto Investment Scam"
+            if signals["social_engineering"] or signals["urgency"]:
+                return "Crypto/Investment Promotion"
+            return "General Message"
+        
+        # Phishing - combination of impersonation + credential theft
         if signals["credential_theft"] and signals["impersonation"]:
+            if signals["urgency"]:
+                return "Urgent Phishing Attempt"
             return "Phishing Attempt"
-        if signals["regional_upi_fraud"] and signals["credential_theft"]:
-            return "UPI/Payment Fraud"
+        
+        # Credential theft without impersonation
+        if signals["credential_theft"]:
+            return "Credential Harvesting Attempt"
+        
+        # UPI/Payment fraud
+        if signals["regional_upi_fraud"]:
+            if signals["credential_theft"] or signals["money_transfer_request"]:
+                return "UPI/Payment Fraud"
+            return "Suspicious Payment Request"
+        
+        # Impersonation alone
+        if signals["impersonation"]:
+            if signals["urgency"]:
+                return "Urgent Impersonation Alert"
+            return "Brand/Authority Impersonation"
+        
+        # Money transfer requests
+        if signals["money_transfer_request"]:
+            return "Money Transfer Request"
+        
+        # Marketing spam
         if signals["spam_marketing"] and not signals["credential_theft"]:
-            return "Promotional Spam"
-        if self._count_matches(text_lower, self.SAFE_CONTEXT_TERMS) >= 2:
-            return "Benign Personal/Business Message"
+            return "Promotional/Marketing Spam"
+        
+        # Social engineering
+        if signals["social_engineering"]:
+            return "Social Engineering Attempt"
+        
+        # Check for safe/benign context
+        safe_hits = self._count_matches(text_lower, self.SAFE_CONTEXT_TERMS)
+        if safe_hits >= 3:
+            return "Professional/Business Communication"
+        elif safe_hits >= 2:
+            return "Personal/Casual Communication"
+        
+        # Financial lures alone
+        if signals["financial_lure"]:
+            return "Financial Scam/Prize Notification"
+        
+        # Suspicious URLs
+        if signals["suspicious_url"]:
+            return "Suspicious Link Message"
+        
+        # Default fallback
         return "General Message"
 
     def _derive_fraud_types(self, text_category: str, signals: Dict[str, bool], risk_level: str) -> List[str]:
@@ -490,7 +578,7 @@ class TextClassifier:
             actions.append("Never send money or share banking details to unknown contacts.")
 
         if not actions:
-            if text_category == "Benign Personal/Business Message":
+            if "Communication" in text_category or text_category == "General Message":
                 actions.append("Message appears low risk; continue normal caution for unknown links.")
             else:
                 actions.append("No strong fraud markers found; verify context if sender is unknown.")
@@ -501,7 +589,19 @@ class TextClassifier:
         base = 0.55
         score_factor = min(0.3, score / 350)
         signal_factor = min(0.12, detected_count * 0.025)
-        category_factor = 0.05 if text_category not in {"General Message", "Benign Personal/Business Message"} else 0.0
+        
+        # Higher confidence for specific fraud categories
+        category_factor = 0.0
+        high_confidence_categories = {
+            "Extortion/Blackmail Threat", "Urgent Phishing Attempt", "Phishing Attempt",
+            "Romance Scam (Money Request)", "Crypto Investment Scam", 
+            "Fraudulent Job Offer (Payment Required)", "UPI/Payment Fraud"
+        }
+        if text_category in high_confidence_categories:
+            category_factor = 0.08
+        elif text_category not in {"General Message", "Personal/Casual Communication", "Professional/Business Communication"}:
+            category_factor = 0.05
+        
         return round(min(0.97, base + score_factor + signal_factor + category_factor), 2)
 
     def _map_risk_level(self, score: int) -> str:
@@ -516,7 +616,8 @@ class TextClassifier:
     def _count_matches(self, text_lower: str, terms: set) -> int:
         hits = 0
         for term in terms:
-            if term in text_lower:
+            escaped = re.escape(term.lower())
+            if re.search(rf"\b{escaped}\b", text_lower):
                 hits += 1
         return hits
 

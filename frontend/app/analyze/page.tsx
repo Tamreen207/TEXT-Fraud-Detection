@@ -5,7 +5,30 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useFraudStore } from "@/store/useFraudStore";
 import { analyzeContent } from "@/lib/gemini";
-import { ScanLine, Shield, Zap, Copy, CheckCircle } from "lucide-react";
+import { detectScamLanguage } from "@/lib/scamLanguageDetector";
+import {
+  calculateThreatIntelligence,
+  detectSocialEngineering,
+  calculateTrustScore,
+  predictRiskTrajectory,
+  performMultiLayerVerification,
+  analyzeBehavioralPatterns,
+} from "@/lib/advancedFraudFeatures";
+import {
+  ScanLine,
+  Shield,
+  Zap,
+  Copy,
+  CheckCircle,
+  Search,
+  AlertCircle,
+  Languages,
+  Target,
+  Brain,
+  TrendingUp,
+  CheckSquare,
+  Activity,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -62,6 +85,8 @@ export default function AnalyzePage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [scamLanguageResult, setScamLanguageResult] = useState<any>(null);
+  const [advancedFeatures, setAdvancedFeatures] = useState<any>(null);
 
   const handleAnalyze = async () => {
     if (!inputText) return;
@@ -69,9 +94,38 @@ export default function AnalyzePage() {
     setIsLoading(true);
     setIsAnalyzing(true);
     setResult(null);
+    setScamLanguageResult(null);
 
     try {
+      // Detect scam language
+      const langResult = detectScamLanguage(inputText);
+      setScamLanguageResult(langResult);
+
       const data = await analyzeContent(inputText, demoMode);
+
+      // Calculate advanced features
+      const threatIntel = calculateThreatIntelligence(
+        inputText,
+        data.risk_score,
+      );
+      const socialEng = detectSocialEngineering(inputText);
+      const trustScore = calculateTrustScore(inputText, data.risk_score);
+      const riskTraj = predictRiskTrajectory(
+        data.risk_score,
+        langResult.detectedPatterns,
+      );
+      const multiLayer = performMultiLayerVerification(inputText);
+      const behavioral = analyzeBehavioralPatterns(inputText);
+
+      setAdvancedFeatures({
+        threatIntel,
+        socialEng,
+        trustScore,
+        riskTraj,
+        multiLayer,
+        behavioral,
+      });
+
       setTimeout(() => {
         setResult(data);
         router.push("/results");
@@ -86,18 +140,19 @@ export default function AnalyzePage() {
     }
   };
 
-  const handleAnalyzeAndGoogleCompare = () => {
-    if (!inputText || inputText.length < 10) {
-      alert("Please enter at least 10 characters to search on Google");
+  const handleGoogleCompare = () => {
+    if (!inputText || inputText.trim().length < 10) {
+      alert("Please enter at least 10 characters before comparing.");
       return;
     }
 
-    // Create Google search query
-    const searchQuery = `is this fraud or scam: ${inputText.substring(0, 200)}`;
-    const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+    // Detect scam language
+    const langResult = detectScamLanguage(inputText);
+    setScamLanguageResult(langResult);
 
-    // Open Google in new tab
-    window.open(googleUrl, "_blank");
+    const query = `is this message fraud or scam: ${inputText.trim().slice(0, 220)}`;
+    const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    window.open(googleUrl, "_blank", "noopener,noreferrer");
   };
 
   const handleExampleClick = (text: string) => {
@@ -148,14 +203,6 @@ export default function AnalyzePage() {
           </span>
           .
         </p>
-        <div>
-          <Link
-            href="/analyze/compare?mode=text"
-            className="text-sm text-blue-600 dark:text-blue-400 font-medium hover:underline"
-          >
-            Compare Text Result with Google/Other APIs
-          </Link>
-        </div>
       </div>
 
       {/* Main Content */}
@@ -250,17 +297,511 @@ export default function AnalyzePage() {
               <Zap className="w-5 h-5 mr-2" />
               {isLoading ? "Analyzing..." : "Analyze Now"}
             </Button>
-            <Link
-              href="#"
-              onClick={(e) => {
-                e.preventDefault();
-                void handleAnalyzeAndGoogleCompare();
-              }}
-              className="h-12 px-6 rounded-lg border-2 border-blue-500 text-blue-600 dark:text-blue-400 font-semibold inline-flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/20"
+            <Button
+              size="lg"
+              className="flex-1 text-base h-12 rounded-lg font-semibold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              onClick={handleGoogleCompare}
+              disabled={!inputText || inputText.length < 10 || isLoading}
             >
+              <Search className="w-5 h-5 mr-2" />
               Compare with Google
-            </Link>
+            </Button>
           </div>
+
+          {/* Scam Language Detector Result */}
+          {scamLanguageResult && (
+            <Card className="p-4 border-2 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30">
+              <div className="flex items-center gap-2 mb-3">
+                <Languages className="w-5 h-5 text-purple-600" />
+                <h3 className="font-semibold text-purple-900 dark:text-purple-100">
+                  🔍 Scam Language Detector
+                </h3>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Language Score:</span>
+                  <span className="text-lg font-bold text-purple-600">
+                    {scamLanguageResult.languageScore}/100
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Urgency Level:</span>
+                  <span
+                    className={`text-sm font-bold uppercase ${scamLanguageResult.urgencyLevel === "critical" ? "text-red-600" : scamLanguageResult.urgencyLevel === "high" ? "text-orange-600" : scamLanguageResult.urgencyLevel === "medium" ? "text-yellow-600" : "text-green-600"}`}
+                  >
+                    {scamLanguageResult.urgencyLevel}
+                  </span>
+                </div>
+                {scamLanguageResult.detectedPatterns.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-sm font-medium mb-1">
+                      Detected Patterns:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {scamLanguageResult.detectedPatterns.map(
+                        (pattern: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs rounded-full border border-red-300 dark:border-red-700"
+                          >
+                            {pattern}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
+                {scamLanguageResult.suspiciousWords.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-sm font-medium mb-1">
+                      Suspicious Keywords:
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {scamLanguageResult.suspiciousWords
+                        .slice(0, 8)
+                        .map((word: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 text-xs rounded border border-yellow-300 dark:border-yellow-700"
+                          >
+                            {word}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+
+          {/* Advanced Features Display */}
+          {advancedFeatures && (
+            <div className="space-y-4 animate-in fade-in duration-500">
+              {/* Threat Intelligence */}
+              <Card className="p-5 border-2 border-red-200 dark:border-red-800 bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-950/30 dark:to-orange-950/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <Target className="w-6 h-6 text-red-600" />
+                  <h3 className="font-bold text-red-900 dark:text-red-100 text-lg">
+                    🎯 Threat Intelligence Level
+                  </h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4 mb-3">
+                  <div>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      Threat Level:
+                    </p>
+                    <p
+                      className={`text-2xl font-bold uppercase ${
+                        advancedFeatures.threatIntel.level === "critical"
+                          ? "text-red-700"
+                          : advancedFeatures.threatIntel.level === "high"
+                            ? "text-orange-600"
+                            : advancedFeatures.threatIntel.level === "moderate"
+                              ? "text-yellow-600"
+                              : "text-green-600"
+                      }`}
+                    >
+                      {advancedFeatures.threatIntel.level}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      Confidence:
+                    </p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {advancedFeatures.threatIntel.confidence}%
+                    </p>
+                  </div>
+                </div>
+                {advancedFeatures.threatIntel.indicators.length > 0 && (
+                  <div className="mt-3">
+                    <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-2">
+                      Threat Indicators:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {advancedFeatures.threatIntel.indicators.map(
+                        (ind: string, idx: number) => (
+                          <span
+                            key={idx}
+                            className="px-3 py-1 bg-red-600 text-white text-xs rounded-full font-semibold"
+                          >
+                            {ind}
+                          </span>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+
+              {/* Social Engineering Detection */}
+              {advancedFeatures.socialEng.detected && (
+                <Card className="p-5 border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Brain className="w-6 h-6 text-purple-600" />
+                    <h3 className="font-bold text-purple-900 dark:text-purple-100 text-lg">
+                      🧠 Social Engineering Detected
+                    </h3>
+                  </div>
+                  <div className="mb-3">
+                    <p className="text-sm text-purple-700 dark:text-purple-300 mb-1">
+                      Manipulation Score:
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 bg-purple-200 dark:bg-purple-900/50 rounded-full h-3">
+                        <div
+                          className="bg-purple-600 h-3 rounded-full transition-all duration-500"
+                          style={{
+                            width: `${advancedFeatures.socialEng.manipulationScore}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="text-lg font-bold text-purple-600">
+                        {advancedFeatures.socialEng.manipulationScore}%
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    {advancedFeatures.socialEng.tactics.length > 0 && (
+                      <div>
+                        <p className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-2">
+                          Tactics Used:
+                        </p>
+                        <ul className="space-y-1">
+                          {advancedFeatures.socialEng.tactics.map(
+                            (tactic: string, idx: number) => (
+                              <li
+                                key={idx}
+                                className="text-xs text-purple-700 dark:text-purple-300 flex items-center gap-1"
+                              >
+                                <span className="text-purple-600">▸</span>
+                                {tactic}
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                    )}
+                    {advancedFeatures.socialEng.psychologicalTriggers.length >
+                      0 && (
+                      <div>
+                        <p className="text-sm font-semibold text-purple-900 dark:text-purple-100 mb-2">
+                          Psychological Triggers:
+                        </p>
+                        <div className="flex flex-wrap gap-1">
+                          {advancedFeatures.socialEng.psychologicalTriggers.map(
+                            (trigger: string, idx: number) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 bg-purple-200 dark:bg-purple-900/50 text-purple-800 dark:text-purple-200 text-xs rounded-full"
+                              >
+                                {trigger}
+                              </span>
+                            ),
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              )}
+
+              {/* Trust Score */}
+              <Card className="p-5 border-2 border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="w-6 h-6 text-blue-600" />
+                  <h3 className="font-bold text-blue-900 dark:text-blue-100 text-lg">
+                    🛡️ Trust Score Analysis
+                  </h3>
+                </div>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm text-blue-700 dark:text-blue-300">
+                      Overall Trust Score:
+                    </p>
+                    <p className="text-4xl font-bold text-blue-600">
+                      {advancedFeatures.trustScore.score}/100
+                    </p>
+                  </div>
+                  <div
+                    className={`px-4 py-2 rounded-lg font-bold uppercase ${
+                      advancedFeatures.trustScore.verdict === "highly_trusted"
+                        ? "bg-green-200 text-green-800"
+                        : advancedFeatures.trustScore.verdict === "trusted"
+                          ? "bg-blue-200 text-blue-800"
+                          : advancedFeatures.trustScore.verdict === "neutral"
+                            ? "bg-gray-200 text-gray-800"
+                            : advancedFeatures.trustScore.verdict ===
+                                "suspicious"
+                              ? "bg-yellow-200 text-yellow-800"
+                              : "bg-red-200 text-red-800"
+                    }`}
+                  >
+                    {advancedFeatures.trustScore.verdict.replace("_", " ")}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <p className="text-blue-700 dark:text-blue-300 mb-1">
+                      Domain Reputation
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-blue-200 dark:bg-blue-900/50 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{
+                            width: `${advancedFeatures.trustScore.factors.domainReputation}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="font-semibold">
+                        {advancedFeatures.trustScore.factors.domainReputation}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-blue-700 dark:text-blue-300 mb-1">
+                      Content Quality
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-blue-200 dark:bg-blue-900/50 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{
+                            width: `${advancedFeatures.trustScore.factors.contentQuality}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="font-semibold">
+                        {advancedFeatures.trustScore.factors.contentQuality}
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-blue-700 dark:text-blue-300 mb-1">
+                      Linguistic Authenticity
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-blue-200 dark:bg-blue-900/50 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{
+                            width: `${advancedFeatures.trustScore.factors.linguisticAuthenticity}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="font-semibold">
+                        {
+                          advancedFeatures.trustScore.factors
+                            .linguisticAuthenticity
+                        }
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-blue-700 dark:text-blue-300 mb-1">
+                      Historical Patterns
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-blue-200 dark:bg-blue-900/50 rounded-full h-2">
+                        <div
+                          className="bg-blue-600 h-2 rounded-full"
+                          style={{
+                            width: `${advancedFeatures.trustScore.factors.historicalPatterns}%`,
+                          }}
+                        />
+                      </div>
+                      <span className="font-semibold">
+                        {advancedFeatures.trustScore.factors.historicalPatterns}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Risk Trajectory */}
+              <Card className="p-5 border-2 border-orange-200 dark:border-orange-800 bg-gradient-to-br from-orange-50 to-yellow-50 dark:from-orange-950/30 dark:to-yellow-950/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="w-6 h-6 text-orange-600" />
+                  <h3 className="font-bold text-orange-900 dark:text-orange-100 text-lg">
+                    📈 Risk Trajectory Prediction
+                  </h3>
+                </div>
+                <div className="grid grid-cols-3 gap-4 mb-3">
+                  <div>
+                    <p className="text-sm text-orange-700 dark:text-orange-300">
+                      Current Risk:
+                    </p>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {advancedFeatures.riskTraj.current}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-orange-700 dark:text-orange-300">
+                      24h Prediction:
+                    </p>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {advancedFeatures.riskTraj.predicted24h}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-orange-700 dark:text-orange-300">
+                      Trend:
+                    </p>
+                    <p
+                      className={`text-lg font-bold uppercase ${
+                        advancedFeatures.riskTraj.trend === "spiking"
+                          ? "text-red-600"
+                          : advancedFeatures.riskTraj.trend === "increasing"
+                            ? "text-orange-600"
+                            : advancedFeatures.riskTraj.trend === "decreasing"
+                              ? "text-green-600"
+                              : "text-blue-600"
+                      }`}
+                    >
+                      {advancedFeatures.riskTraj.trend}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-orange-700 dark:text-orange-300">
+                    Volatility:
+                  </p>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      advancedFeatures.riskTraj.volatility === "high"
+                        ? "bg-red-200 text-red-800"
+                        : advancedFeatures.riskTraj.volatility === "medium"
+                          ? "bg-yellow-200 text-yellow-800"
+                          : "bg-green-200 text-green-800"
+                    }`}
+                  >
+                    {advancedFeatures.riskTraj.volatility.toUpperCase()}
+                  </span>
+                </div>
+              </Card>
+
+              {/* Multi-Layer Verification */}
+              <Card className="p-5 border-2 border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckSquare className="w-6 h-6 text-green-600" />
+                  <h3 className="font-bold text-green-900 dark:text-green-100 text-lg">
+                    ✅ Multi-Layer Verification
+                  </h3>
+                </div>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className="text-sm text-green-700 dark:text-green-300">
+                      Layers Passed:
+                    </p>
+                    <p className="text-3xl font-bold text-green-600">
+                      {advancedFeatures.multiLayer.layersPassed}/
+                      {advancedFeatures.multiLayer.totalLayers}
+                    </p>
+                  </div>
+                  <div
+                    className={`px-4 py-2 rounded-lg font-bold uppercase ${
+                      advancedFeatures.multiLayer.overallVerification ===
+                      "passed"
+                        ? "bg-green-200 text-green-800"
+                        : advancedFeatures.multiLayer.overallVerification ===
+                            "partial"
+                          ? "bg-yellow-200 text-yellow-800"
+                          : "bg-red-200 text-red-800"
+                    }`}
+                  >
+                    {advancedFeatures.multiLayer.overallVerification}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  {Object.entries(advancedFeatures.multiLayer.layers).map(
+                    ([key, layer]: [string, any]) => (
+                      <div
+                        key={key}
+                        className="flex items-center justify-between text-sm"
+                      >
+                        <span className="text-green-800 dark:text-green-200 capitalize">
+                          {key.replace(/([A-Z])/g, " $1").trim()}:
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-green-700 dark:text-green-300">
+                            {layer.details}
+                          </span>
+                          <span
+                            className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                              layer.passed
+                                ? "bg-green-500 text-white"
+                                : "bg-red-500 text-white"
+                            }`}
+                          >
+                            {layer.passed ? "✓" : "✗"}
+                          </span>
+                        </div>
+                      </div>
+                    ),
+                  )}
+                </div>
+              </Card>
+
+              {/* Behavioral Patterns */}
+              {advancedFeatures.behavioral.length > 0 && (
+                <Card className="p-5 border-2 border-indigo-200 dark:border-indigo-800 bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Activity className="w-6 h-6 text-indigo-600" />
+                    <h3 className="font-bold text-indigo-900 dark:text-indigo-100 text-lg">
+                      📊 Behavioral Pattern Analysis
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    {advancedFeatures.behavioral.map(
+                      (pattern: any, idx: number) => (
+                        <div
+                          key={idx}
+                          className="border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 bg-white/50 dark:bg-black/20"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-semibold text-indigo-900 dark:text-indigo-100">
+                              {pattern.pattern}
+                            </p>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                                pattern.frequency === "frequent"
+                                  ? "bg-red-200 text-red-800"
+                                  : pattern.frequency === "common"
+                                    ? "bg-orange-200 text-orange-800"
+                                    : pattern.frequency === "occasional"
+                                      ? "bg-yellow-200 text-yellow-800"
+                                      : "bg-green-200 text-green-800"
+                              }`}
+                            >
+                              {pattern.frequency.toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="text-indigo-700 dark:text-indigo-300">
+                              Risk: +{pattern.riskContribution}
+                            </span>
+                            <div className="flex flex-wrap gap-1">
+                              {pattern.examples.map(
+                                (ex: string, exIdx: number) => (
+                                  <span
+                                    key={exIdx}
+                                    className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded"
+                                  >
+                                    {ex}
+                                  </span>
+                                ),
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ),
+                    )}
+                  </div>
+                </Card>
+              )}
+            </div>
+          )}
 
           {/* Info Box */}
           <div className="bg-card border border-border rounded-lg p-4 text-sm text-muted-foreground space-y-2">

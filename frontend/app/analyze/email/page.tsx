@@ -1,17 +1,21 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+
+import { detectScamLanguage } from "@/lib/scamLanguageDetector";
 import {
   Mail,
   Shield,
   AlertTriangle,
   CheckCircle,
   Loader2,
+  Search,
+  Languages,
 } from "lucide-react";
 
 interface EmailAnalysisResult {
@@ -60,25 +64,28 @@ const EMAIL_DEMOS = {
 };
 
 export default function EmailAnalyzePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [emailContent, setEmailContent] = useState("");
   const [sender, setSender] = useState("");
   const [subject, setSubject] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<EmailAnalysisResult | null>(null);
   const [error, setError] = useState("");
+  const [scamLanguageResult, setScamLanguageResult] = useState<any>(null);
 
   const getBackendBaseUrls = (): string[] => {
     const fromEnv = process.env.NEXT_PUBLIC_BACKEND_URL?.trim();
     const fromWindow =
       typeof window !== "undefined"
-        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        ? `${window.location.protocol}//${window.location.hostname}:8000`
         : undefined;
 
     const candidates = [
       fromEnv,
       fromWindow,
-      "http://127.0.0.1:8080",
-      "http://localhost:8080",
+      "http://127.0.0.1:8000",
+      "http://localhost:8000",
     ].filter((value): value is string => Boolean(value));
 
     return [...new Set(candidates)];
@@ -129,7 +136,7 @@ export default function EmailAnalyzePage() {
       setResult(data);
     } catch (err) {
       setError(
-        "Failed to connect to backend email analyzer. Ensure backend is running on port 8080.",
+        "Failed to connect to backend email analyzer. Ensure backend is running on port 8000.",
       );
       console.error(err);
     } finally {
@@ -161,26 +168,42 @@ export default function EmailAnalyzePage() {
   };
 
   const handleGoogleCompare = () => {
-    if (!result) {
-      setError("Run email analysis first, then verify with Google.");
+    if (!emailContent.trim()) {
+      setError("Enter email content before verifying with Google.");
       return;
     }
 
-    // Create Google search query for email
+    // Detect scam language
+    const fullEmail = `${sender} ${subject} ${emailContent}`;
+    const langResult = detectScamLanguage(fullEmail);
+    setScamLanguageResult(langResult);
+
     const searchParts = [
       sender && `from ${sender}`,
-      subject && `subject: ${subject}`,
-      emailContent.substring(0, 150),
+      subject && `subject ${subject}`,
+      emailContent.trim().slice(0, 180),
     ]
       .filter(Boolean)
       .join(" ");
 
-    const searchQuery = `is this email fraud or scam: ${searchParts}`;
+    const searchQuery = `is this email fraud scam phishing: ${searchParts}`;
     const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
-
-    // Open Google in new tab
-    window.open(googleUrl, "_blank");
+    window.open(googleUrl, "_blank", "noopener,noreferrer");
   };
+
+  useEffect(() => {
+    const demoSender = searchParams.get("sender");
+    const demoSubject = searchParams.get("subject");
+    const demoBody = searchParams.get("body");
+
+    if (demoSender || demoSubject || demoBody) {
+      setSender(demoSender ?? "");
+      setSubject(demoSubject ?? "");
+      setEmailContent(demoBody ?? "");
+      setResult(null);
+      setError("");
+    }
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-blue-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -196,14 +219,6 @@ export default function EmailAnalyzePage() {
           <p className="text-muted-foreground text-lg">
             Detect spam, phishing, and fraudulent emails with AI
           </p>
-          <div className="mt-4">
-            <Link
-              href="/analyze/compare?mode=email"
-              className="text-sm text-blue-600 dark:text-blue-400 font-medium hover:underline"
-            >
-              Compare Email Result with Google/Other APIs
-            </Link>
-          </div>
         </div>
 
         {/* Input Section */}
@@ -298,17 +313,77 @@ export default function EmailAnalyzePage() {
                   </>
                 )}
               </Button>
-              <Link
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleGoogleCompare();
-                }}
-                className="sm:w-auto w-full px-6 rounded-lg border-2 border-blue-500 text-blue-600 dark:text-blue-400 font-semibold inline-flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/20"
+              <Button
+                onClick={handleGoogleCompare}
+                disabled={isAnalyzing || !emailContent.trim()}
+                className="flex-1 py-6 text-lg bg-blue-600 hover:bg-blue-700 text-white"
               >
+                <Search className="w-5 h-5 mr-2" />
                 Compare with Google
-              </Link>
+              </Button>
             </div>
+
+            {/* Scam Language Detector Result */}
+            {scamLanguageResult && (
+              <div className="p-4 border-2 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <Languages className="w-5 h-5 text-purple-600" />
+                  <h3 className="font-semibold text-purple-900 dark:text-purple-100">
+                    🔍 Scam Language Detector
+                  </h3>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="font-medium">Language Score:</span>
+                    <span className="font-bold text-purple-600">
+                      {scamLanguageResult.languageScore}/100
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Urgency Level:</span>
+                    <span
+                      className={`font-bold uppercase ${scamLanguageResult.urgencyLevel === "critical" ? "text-red-600" : scamLanguageResult.urgencyLevel === "high" ? "text-orange-600" : scamLanguageResult.urgencyLevel === "medium" ? "text-yellow-600" : "text-green-600"}`}
+                    >
+                      {scamLanguageResult.urgencyLevel}
+                    </span>
+                  </div>
+                  {scamLanguageResult.detectedPatterns.length > 0 && (
+                    <div className="mt-2">
+                      <p className="font-medium mb-1">Detected Patterns:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {scamLanguageResult.detectedPatterns.map(
+                          (pattern: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs rounded-full"
+                            >
+                              {pattern}
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {scamLanguageResult.suspiciousWords.length > 0 && (
+                    <div className="mt-2">
+                      <p className="font-medium mb-1">Suspicious Keywords:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {scamLanguageResult.suspiciousWords
+                          .slice(0, 8)
+                          .map((word: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 text-xs rounded"
+                            >
+                              {word}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </Card>
 
@@ -563,6 +638,55 @@ export default function EmailAnalyzePage() {
                 ))}
               </ul>
             </Card>
+
+            {/* Unique Features Showcase */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="p-4 border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></div>
+                  <p className="text-xs uppercase tracking-wider text-purple-700 dark:text-purple-300 font-bold">
+                    Email Intel
+                  </p>
+                </div>
+                <p className="font-semibold text-sm text-purple-900 dark:text-purple-100">
+                  Sender Analysis
+                </p>
+                <p className="text-xs text-purple-700 dark:text-purple-300 mt-1">
+                  Domain reputation check with trusted/suspicious sender
+                  detection.
+                </p>
+              </Card>
+
+              <Card className="p-4 border-2 border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                  <p className="text-xs uppercase tracking-wider text-blue-700 dark:text-blue-300 font-bold">
+                    Content AI
+                  </p>
+                </div>
+                <p className="font-semibold text-sm text-blue-900 dark:text-blue-100">
+                  Semantic Analysis
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                  Deep content analysis with subject and body fraud detection.
+                </p>
+              </Card>
+
+              <Card className="p-4 border-2 border-pink-200 dark:border-pink-800 bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-950/30 dark:to-pink-900/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 rounded-full bg-pink-600"></div>
+                  <p className="text-xs uppercase tracking-wider text-pink-700 dark:text-pink-300 font-bold">
+                    Google Verify
+                  </p>
+                </div>
+                <p className="font-semibold text-sm text-pink-900 dark:text-pink-100">
+                  Cross-Validation
+                </p>
+                <p className="text-xs text-pink-700 dark:text-pink-300 mt-1">
+                  One-click Google search verification for instant validation.
+                </p>
+              </Card>
+            </div>
           </div>
         )}
       </div>

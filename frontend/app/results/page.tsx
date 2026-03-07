@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFraudStore } from "@/store/useFraudStore";
 import { RiskMeter } from "@/components/results/RiskMeter";
@@ -24,23 +24,193 @@ import {
   Paperclip,
   AlertTriangle,
   Smartphone,
-  Search,
+  Copy,
+  Download,
   Bot,
   User,
+  Search,
+  Link as LinkIcon,
+  Target,
+  Brain,
+  TrendingUp,
+  Activity,
 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { saveComparePayload } from "@/lib/googleVerification";
 
 export default function ResultsPage() {
   const router = useRouter();
   const { result, isAnalyzing, inputText } = useFraudStore();
+  const [copiedSummary, setCopiedSummary] = useState(false);
+  const [enhancedGrammarScore, setEnhancedGrammarScore] = useState<number>(0);
+  const [linkThreatLevel, setLinkThreatLevel] = useState<string>("Unknown");
+  const [advancedRiskFactors, setAdvancedRiskFactors] = useState<any>(null);
 
   useEffect(() => {
     if (!isAnalyzing && !result && !inputText) {
       router.push("/analyze");
     }
   }, [isAnalyzing, result, inputText, router]);
+
+  // Enhanced Grammar Score Calculation
+  useEffect(() => {
+    if (result && inputText) {
+      let score = 100;
+      const text = inputText.toLowerCase();
+
+      // Advanced grammar and quality checks
+      const sentences = inputText
+        .split(/[.!?]+/)
+        .filter((s) => s.trim().length > 0);
+      const words = inputText.split(/\s+/).filter((w) => w.length > 0);
+
+      // Penalty for all caps
+      if (inputText === inputText.toUpperCase() && inputText.length > 20) {
+        score -= 15;
+      }
+
+      // Penalty for excessive punctuation
+      const punctuationCount = (inputText.match(/[!?]{2,}/g) || []).length;
+      score -= punctuationCount * 5;
+
+      // Penalty for common scam grammar mistakes
+      const grammarIssues = [
+        /\b(u r|ur)\b/i,
+        /\b(pls|plz)\b/i,
+        /\b(msg|msgs)\b/i,
+        /\bcongrat\b/i,
+        /\bwin ned\b/i,
+        /\b(yr|yrs)\b(?! old)/i,
+      ];
+
+      grammarIssues.forEach((pattern) => {
+        if (pattern.test(text)) score -= 8;
+      });
+
+      // Penalty for inconsistent spacing
+      if (text.includes("  ") || text.includes(" ,") || text.includes(" .")) {
+        score -= 10;
+      }
+
+      // Bonus for proper capitalization
+      const properSentences = sentences.filter((s) => {
+        const trimmed = s.trim();
+        return trimmed.length > 0 && trimmed[0] === trimmed[0].toUpperCase();
+      });
+      if (
+        sentences.length > 0 &&
+        properSentences.length / sentences.length > 0.8
+      ) {
+        score += 5;
+      }
+
+      // Use existing score if available, otherwise use calculated
+      const finalScore =
+        result.text_error_analysis?.score || Math.max(0, Math.min(100, score));
+      setEnhancedGrammarScore(finalScore);
+
+      // Enhanced Link Threat Analysis
+      const urlPattern =
+        /(https?:\/\/[^\s]+)|(www\.[^\s]+)|(\b[a-z0-9-]+\.(com|org|net|info|xyz|tk|ml|ga|cf|gq|club|top|online|site|live|tech|store)\b)/gi;
+      const urls = inputText.match(urlPattern) || [];
+
+      if (urls.length > 0) {
+        const hasShortener = urls.some((url) =>
+          /bit\.ly|tinyurl|goo\.gl|t\.co|ow\.ly|is\.gd|buff\.ly|adf\.ly/i.test(
+            url,
+          ),
+        );
+        const hasSuspiciousTLD = urls.some((url) =>
+          /\.(tk|ml|ga|cf|gq|xyz|top|club|online|site|live)$/i.test(url),
+        );
+        const hasIPAddress = urls.some((url) =>
+          /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/.test(url),
+        );
+
+        if (hasIPAddress || (hasShortener && hasSuspiciousTLD)) {
+          setLinkThreatLevel("Critical");
+        } else if (hasShortener || hasSuspiciousTLD) {
+          setLinkThreatLevel("High");
+        } else if (urls.length > 3) {
+          setLinkThreatLevel("Medium");
+        } else {
+          setLinkThreatLevel("Low");
+        }
+      }
+
+      // Calculate Advanced Risk Factors
+      const urgencyWords = [
+        "urgent",
+        "immediately",
+        "asap",
+        "now",
+        "hurry",
+        "expire",
+        "limited",
+      ];
+      const moneyWords = [
+        "cash",
+        "prize",
+        "reward",
+        "refund",
+        "payment",
+        "win",
+        "lottery",
+      ];
+      const credentialWords = [
+        "password",
+        "otp",
+        "pin",
+        "verify",
+        "confirm",
+        "account",
+      ];
+
+      const urgencyCount = urgencyWords.filter((word) =>
+        text.includes(word),
+      ).length;
+      const moneyCount = moneyWords.filter((word) =>
+        text.includes(word),
+      ).length;
+      const credentialCount = credentialWords.filter((word) =>
+        text.includes(word),
+      ).length;
+
+      setAdvancedRiskFactors({
+        urgencyPressure:
+          urgencyCount > 0 ? Math.min(100, urgencyCount * 30) : 0,
+        financialLure: moneyCount > 0 ? Math.min(100, moneyCount * 25) : 0,
+        credentialTheft:
+          credentialCount > 0 ? Math.min(100, credentialCount * 40) : 0,
+        manipulationScore: Math.min(
+          100,
+          (urgencyCount + moneyCount + credentialCount) * 15,
+        ),
+      });
+    }
+  }, [result, inputText]);
+
+  const handleGoogleCompare = () => {
+    if (!inputText) return;
+
+    // Extract URLs if present
+    const urlPattern = /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
+    const urls = inputText.match(urlPattern) || [];
+
+    let searchQuery = "";
+    if (urls.length > 0) {
+      searchQuery = `is ${urls[0]} fraud scam phishing website malware`;
+    } else {
+      const snippet = inputText.slice(0, 100);
+      searchQuery = `is this message fraud scam phishing: ${snippet}`;
+    }
+
+    window.open(
+      `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
 
   if (isAnalyzing) {
     return (
@@ -74,22 +244,58 @@ export default function ResultsPage() {
     show: { opacity: 1, y: 0 },
   };
 
-  const handleGoogleCompare = () => {
-    if (!inputText || !result) return;
+  const riskFingerprint = useMemo(() => {
+    if (!result) return "FG-00000000";
+    const raw = `${result.risk_score}|${result.risk_level}|${result.message_type}|${(result.fraud_type || []).join("|")}`;
+    let hash = 0;
+    for (let index = 0; index < raw.length; index += 1) {
+      hash = (hash << 5) - hash + raw.charCodeAt(index);
+      hash |= 0;
+    }
+    const token = Math.abs(hash)
+      .toString(36)
+      .toUpperCase()
+      .padStart(8, "0")
+      .slice(0, 8);
+    return `FG-${token}`;
+  }, [result]);
 
-    saveComparePayload({
-      mode: "text",
-      input: inputText,
-      fraudguard: {
-        isFraud: result.is_fraud,
-        riskScore: result.risk_score,
-        riskLevel: String(result.risk_level),
-        messageType: result.message_type,
-      },
-      timestamp: Date.now(),
+  const handleCopySummary = async () => {
+    if (!result) return;
+    const summary = [
+      "FraudGuard Analysis Summary",
+      `Risk Score: ${result.risk_score}/100`,
+      `Risk Level: ${String(result.risk_level)}`,
+      `Message Type: ${String(result.message_type)}`,
+      `Fraud Verdict: ${result.is_fraud ? "Fraud/Suspicious" : "Likely Safe"}`,
+      `Fingerprint: ${riskFingerprint}`,
+      `Signals: ${(result.fraud_type || []).join(", ") || "None"}`,
+    ].join("\n");
+
+    await navigator.clipboard.writeText(summary);
+    setCopiedSummary(true);
+    setTimeout(() => setCopiedSummary(false), 1800);
+  };
+
+  const handleDownloadSnapshot = () => {
+    if (!result) return;
+    const snapshot = {
+      generatedAt: new Date().toISOString(),
+      fingerprint: riskFingerprint,
+      inputText,
+      result,
+    };
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
+      type: "application/json",
     });
-
-    router.push("/analyze/compare?mode=text");
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `fraudguard-snapshot-${riskFingerprint}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -118,17 +324,33 @@ export default function ResultsPage() {
           </div>
         </div>
 
-        {/* Google Search Comparison Button */}
-        {inputText && (
-          <button
-            onClick={handleGoogleCompare}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl font-semibold text-sm transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap"
-            title="Verify this content with Google and compare verdicts"
-          >
-            <Search className="w-4 h-4" />
-            <span className="hidden sm:inline">Compare with Google</span>
-            <span className="sm:hidden">Google</span>
-          </button>
+        {result && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleGoogleCompare}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold transition-all shadow-md hover:shadow-lg"
+              title="Verify this content with Google search"
+            >
+              <Search className="w-4 h-4" />
+              Compare with Google
+            </button>
+            <button
+              onClick={handleCopySummary}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted/60 text-sm font-medium transition-colors"
+              title="Copy concise fraud analysis summary"
+            >
+              <Copy className="w-4 h-4" />
+              {copiedSummary ? "Copied" : "Copy Summary"}
+            </button>
+            <button
+              onClick={handleDownloadSnapshot}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-border bg-card hover:bg-muted/60 text-sm font-medium transition-colors"
+              title="Download full analysis snapshot as JSON"
+            >
+              <Download className="w-4 h-4" />
+              Snapshot JSON
+            </button>
+          </div>
         )}
       </div>
 
@@ -137,12 +359,23 @@ export default function ResultsPage() {
         <div className="lg:col-span-1 space-y-6">
           <motion.div
             variants={item}
-            className="card-hover bg-gradient-to-br from-card via-card to-card/50 border-2 border-primary/30 p-8 rounded-2xl text-center relative overflow-hidden group"
+            className="card-hover bg-gradient-to-br from-card via-card to-card/50 border-2 border-primary/30 p-8 rounded-2xl text-center relative overflow-hidden group shadow-xl"
           >
-            {/* Background Glow */}
-            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-primary/5 to-secondary/5 pointer-events-none"></div>
+            {/* Enhanced Background Glow */}
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-primary/10 to-secondary/10 pointer-events-none"></div>
+
+            {/* Animated gradient border effect */}
+            <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-20 blur-xl transition-all duration-500"></div>
 
             <div className="relative z-10">
+              {/* Real-time indicator */}
+              <div className="absolute top-0 right-0 flex items-center gap-2 bg-green-500/20 px-3 py-1 rounded-full border border-green-500/30">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="text-xs font-semibold text-green-700 dark:text-green-400">
+                  LIVE
+                </span>
+              </div>
+
               <RiskMeter
                 score={result.risk_score}
                 level={
@@ -154,53 +387,108 @@ export default function ResultsPage() {
                 }
               />
               <h2
-                className={`text-2xl font-display font-bold mt-6 ${
+                className={`text-3xl font-display font-bold mt-6 ${
                   (result.risk_level as string) === "Critical" ||
                   (result.risk_level as string) === "High" ||
                   (result.risk_level as string) === "CRITICAL" ||
                   (result.risk_level as string) === "HIGH"
-                    ? "text-danger"
+                    ? "text-danger drop-shadow-lg"
                     : (result.risk_level as string) === "Suspicious" ||
                         (result.risk_level as string) === "Gray"
-                      ? "text-warning"
-                      : "text-safe"
+                      ? "text-warning drop-shadow-lg"
+                      : "text-safe drop-shadow-lg"
                 }`}
               >
                 {result.risk_level} Risk
               </h2>
+              <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-border/60 bg-muted/50 px-4 py-2 text-xs font-semibold text-muted-foreground shadow-sm">
+                <ShieldCheck className="w-4 h-4" />
+                Fingerprint: {riskFingerprint}
+              </div>
 
               {/* Message Type Badge - Prominent Display */}
               <div className="mt-6 mb-4">
                 <span
                   className={`inline-flex items-center gap-2 px-6 py-3 rounded-full text-base font-bold uppercase border-2 transition-all shadow-md ${
-                    result.message_type === "Friendly Message"
+                    String(result.message_type)?.includes("Communication") ||
+                    String(result.message_type) === "General Message" ||
+                    String(result.message_type)?.includes("Friendly")
                       ? "bg-green-500/20 text-green-700 dark:text-green-400 border-green-500/50"
-                      : result.message_type === "Safe Link"
+                      : String(result.message_type) === "Safe Link"
                         ? "bg-blue-500/20 text-blue-700 dark:text-blue-400 border-blue-500/50"
-                        : result.message_type === "Suspicious Link"
+                        : String(result.message_type)?.includes("Suspicious") &&
+                            !String(result.message_type)?.includes("Phishing")
                           ? "bg-orange-600/20 text-orange-700 dark:text-orange-400 border-orange-600/50"
-                          : result.message_type === "Spam/Marketing"
+                          : String(result.message_type)?.includes("Spam") ||
+                              String(result.message_type)?.includes(
+                                "Marketing",
+                              ) ||
+                              String(result.message_type)?.includes(
+                                "Promotional",
+                              )
                             ? "bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/50"
-                            : result.message_type === "Suspicious"
-                              ? "bg-orange-500/20 text-orange-700 dark:text-orange-400 border-orange-500/50"
-                              : result.message_type === "Job Scam"
-                                ? "bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/50"
-                                : result.message_type === "Phishing"
-                                  ? "bg-red-600/20 text-red-700 dark:text-red-400 border-red-600/50"
-                                  : result.message_type === "Financial Fraud"
-                                    ? "bg-purple-600/20 text-purple-700 dark:text-purple-400 border-purple-600/50"
-                                    : result.message_type ===
-                                        "Blackmail/Extortion"
-                                      ? "bg-red-700/20 text-red-800 dark:text-red-400 border-red-700/50"
-                                      : result.message_type ===
-                                          "Tech Support Scam"
-                                        ? "bg-blue-600/20 text-blue-700 dark:text-blue-400 border-blue-600/50"
-                                        : result.message_type === "UPI Fraud"
-                                          ? "bg-red-800/20 text-red-900 dark:text-red-400 border-red-800/50"
-                                          : result.message_type ===
-                                              "Impersonation"
-                                            ? "bg-indigo-600/20 text-indigo-700 dark:text-indigo-400 border-indigo-600/50"
-                                            : "bg-slate-500/20 text-slate-700 dark:text-slate-400 border-slate-500/50"
+                            : String(result.message_type)?.includes("Job") ||
+                                String(result.message_type)?.includes(
+                                  "Employment",
+                                )
+                              ? "bg-pink-500/20 text-pink-700 dark:text-pink-400 border-pink-500/50"
+                              : String(result.message_type)?.includes(
+                                    "Phishing",
+                                  )
+                                ? "bg-red-600/20 text-red-700 dark:text-red-400 border-red-600/50"
+                                : String(result.message_type)?.includes(
+                                      "Financial",
+                                    ) ||
+                                    String(result.message_type)?.includes(
+                                      "Prize",
+                                    )
+                                  ? "bg-purple-600/20 text-purple-700 dark:text-purple-400 border-purple-600/50"
+                                  : String(result.message_type)?.includes(
+                                        "Extortion",
+                                      ) ||
+                                      String(result.message_type)?.includes(
+                                        "Blackmail",
+                                      ) ||
+                                      String(result.message_type)?.includes(
+                                        "Threat",
+                                      )
+                                    ? "bg-red-800/20 text-red-900 dark:text-red-400 border-red-800/50"
+                                    : String(result.message_type)?.includes(
+                                          "Tech Support",
+                                        )
+                                      ? "bg-blue-700/20 text-blue-800 dark:text-blue-400 border-blue-700/50"
+                                      : String(result.message_type)?.includes(
+                                            "UPI",
+                                          ) ||
+                                          String(result.message_type)?.includes(
+                                            "Payment",
+                                          )
+                                        ? "bg-red-700/20 text-red-800 dark:text-red-400 border-red-700/50"
+                                        : String(result.message_type)?.includes(
+                                              "Impersonation",
+                                            )
+                                          ? "bg-indigo-600/20 text-indigo-700 dark:text-indigo-400 border-indigo-600/50"
+                                          : String(
+                                                result.message_type,
+                                              )?.includes("Romance")
+                                            ? "bg-pink-600/20 text-pink-700 dark:text-pink-400 border-pink-600/50"
+                                            : String(
+                                                  result.message_type,
+                                                )?.includes("Crypto") ||
+                                                String(
+                                                  result.message_type,
+                                                )?.includes("Investment")
+                                              ? "bg-amber-600/20 text-amber-700 dark:text-amber-400 border-amber-600/50"
+                                              : String(
+                                                    result.message_type,
+                                                  )?.includes(
+                                                    "Money Transfer",
+                                                  ) ||
+                                                  String(
+                                                    result.message_type,
+                                                  )?.includes("Credential")
+                                                ? "bg-red-500/20 text-red-700 dark:text-red-400 border-red-500/50"
+                                                : "bg-slate-500/20 text-slate-700 dark:text-slate-400 border-slate-500/50"
                   }`}
                 >
                   <Mail className="w-5 h-5" />
@@ -402,34 +690,245 @@ export default function ResultsPage() {
                 Text Forensics & Quality
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-3 bg-muted/30 rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-1">
-                    Grammar Score
+                <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="text-sm text-muted-foreground mb-1 font-semibold">
+                    Enhanced Grammar Score
                   </div>
-                  <div
-                    className={`text-2xl font-bold ${
-                      result.text_error_analysis.score > 80
-                        ? "text-safe"
-                        : "text-danger"
-                    }`}
-                  >
-                    {result.text_error_analysis.score}/100
+                  <div className="flex items-baseline gap-2">
+                    <div
+                      className={`text-3xl font-bold ${
+                        enhancedGrammarScore > 80
+                          ? "text-green-600 dark:text-green-400"
+                          : enhancedGrammarScore > 60
+                            ? "text-yellow-600 dark:text-yellow-400"
+                            : "text-red-600 dark:text-red-400"
+                      }`}
+                    >
+                      {enhancedGrammarScore}/100
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {enhancedGrammarScore > 80
+                        ? "Excellent"
+                        : enhancedGrammarScore > 60
+                          ? "Fair"
+                          : "Poor"}
+                    </div>
                   </div>
-                  <div className="text-xs mt-1">
+                  <div className="mt-2 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-500 ${
+                        enhancedGrammarScore > 80
+                          ? "bg-green-500"
+                          : enhancedGrammarScore > 60
+                            ? "bg-yellow-500"
+                            : "bg-red-500"
+                      }`}
+                      style={{ width: `${enhancedGrammarScore}%` }}
+                    />
+                  </div>
+                  <div className="text-xs mt-2 text-muted-foreground">
                     Lower scores often indicate scam origins.
                   </div>
                 </div>
-                <div className="p-3 bg-muted/30 rounded-lg">
-                  <div className="text-sm text-muted-foreground mb-1">
+                <div className="p-4 bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
+                  <div className="text-sm text-muted-foreground mb-1 font-semibold">
                     Detected Typos
                   </div>
-                  <div className="text-sm font-mono text-danger">
+                  <div className="text-sm font-mono text-red-600 dark:text-red-400 min-h-[2.5rem] flex items-center">
                     {result.text_error_analysis.typos &&
                     result.text_error_analysis.typos.length > 0
                       ? result.text_error_analysis.typos.join(", ")
-                      : "None Detected"}
+                      : "✓ None Detected"}
+                  </div>
+                  {result.text_error_analysis.typos &&
+                    result.text_error_analysis.typos.length > 0 && (
+                      <div className="text-xs mt-2 text-orange-600 dark:text-orange-400 font-medium">
+                        ⚠️ {result.text_error_analysis.typos.length} spelling
+                        issue(s) found
+                      </div>
+                    )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Advanced Link Threat Analysis */}
+          {inputText &&
+            inputText.match(
+              /(https?:\/\/[^\s]+)|(www\.[^\s]+)|(\b[a-z0-9-]+\.(com|org|net|info|xyz|tk|ml|ga|cf|gq|club|top|online|site|live|tech|store)\b)/gi,
+            ) && (
+              <motion.div
+                variants={item}
+                className="bg-gradient-to-br from-card to-card/50 border-2 border-primary/20 p-6 rounded-2xl shadow-lg"
+              >
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                  <LinkIcon className="w-5 h-5 text-primary" />
+                  Advanced Link Threat Analysis
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 rounded-lg border-2 border-purple-200 dark:border-purple-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <Target className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                      <span
+                        className={`text-xs font-bold px-2 py-1 rounded-full ${
+                          linkThreatLevel === "Critical"
+                            ? "bg-red-600 text-white"
+                            : linkThreatLevel === "High"
+                              ? "bg-orange-500 text-white"
+                              : linkThreatLevel === "Medium"
+                                ? "bg-yellow-500 text-black"
+                                : "bg-green-500 text-white"
+                        }`}
+                      >
+                        {linkThreatLevel}
+                      </span>
+                    </div>
+                    <div className="text-sm font-semibold text-muted-foreground">
+                      Link Threat Level
+                    </div>
+                    <div className="text-xs mt-1 text-muted-foreground">
+                      {linkThreatLevel === "Critical"
+                        ? "Immediate action required!"
+                        : linkThreatLevel === "High"
+                          ? "High risk indicators detected"
+                          : linkThreatLevel === "Medium"
+                            ? "Proceed with caution"
+                            : "Links appear safe"}
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-cyan-50 to-blue-50 dark:from-cyan-950/30 dark:to-blue-950/30 rounded-lg border-2 border-cyan-200 dark:border-cyan-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <Activity className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
+                      <span className="text-xs font-bold px-2 py-1 bg-cyan-600 text-white rounded-full">
+                        {
+                          (
+                            inputText.match(
+                              /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi,
+                            ) || []
+                          ).length
+                        }
+                      </span>
+                    </div>
+                    <div className="text-sm font-semibold text-muted-foreground">
+                      URLs Detected
+                    </div>
+                    <div className="text-xs mt-1 text-muted-foreground">
+                      Multiple links increase risk
+                    </div>
+                  </div>
+                  <div className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-lg border-2 border-green-200 dark:border-green-800">
+                    <div className="flex items-center justify-between mb-2">
+                      <Brain className="w-5 h-5 text-green-600 dark:text-green-400" />
+                      <span className="text-xs font-bold px-2 py-1 bg-green-600 text-white rounded-full">
+                        AI
+                      </span>
+                    </div>
+                    <div className="text-sm font-semibold text-muted-foreground">
+                      Smart Detection
+                    </div>
+                    <div className="text-xs mt-1 text-muted-foreground">
+                      Checks shorteners, TLDs, IPs
+                    </div>
                   </div>
                 </div>
+              </motion.div>
+            )}
+
+          {/* Advanced Psychological Risk Factors */}
+          {advancedRiskFactors && (
+            <motion.div
+              variants={item}
+              className="bg-gradient-to-br from-red-50 via-orange-50 to-yellow-50 dark:from-red-950/20 dark:via-orange-950/20 dark:to-yellow-950/20 border-2 border-red-200 dark:border-red-800 p-6 rounded-2xl shadow-lg"
+            >
+              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <Brain className="w-5 h-5 text-red-600 dark:text-red-400" />
+                Psychological Manipulation Analysis
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-semibold">
+                        Urgency Pressure
+                      </span>
+                      <span className="text-sm font-bold text-orange-600 dark:text-orange-400">
+                        {advancedRiskFactors.urgencyPressure}%
+                      </span>
+                    </div>
+                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-orange-500 to-red-500 transition-all duration-500"
+                        style={{
+                          width: `${advancedRiskFactors.urgencyPressure}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-semibold">
+                        Financial Lure
+                      </span>
+                      <span className="text-sm font-bold text-yellow-600 dark:text-yellow-400">
+                        {advancedRiskFactors.financialLure}%
+                      </span>
+                    </div>
+                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-yellow-500 to-orange-500 transition-all duration-500"
+                        style={{
+                          width: `${advancedRiskFactors.financialLure}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-semibold">
+                        Credential Theft Risk
+                      </span>
+                      <span className="text-sm font-bold text-red-600 dark:text-red-400">
+                        {advancedRiskFactors.credentialTheft}%
+                      </span>
+                    </div>
+                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-red-500 to-pink-500 transition-all duration-500"
+                        style={{
+                          width: `${advancedRiskFactors.credentialTheft}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm font-semibold">
+                        Overall Manipulation
+                      </span>
+                      <span className="text-sm font-bold text-purple-600 dark:text-purple-400">
+                        {advancedRiskFactors.manipulationScore}%
+                      </span>
+                    </div>
+                    <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500"
+                        style={{
+                          width: `${advancedRiskFactors.manipulationScore}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-white/60 dark:bg-black/20 rounded-lg border border-red-200 dark:border-red-800">
+                <p className="text-xs text-muted-foreground flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                  <strong>Detection Method:</strong> Advanced NLP pattern
+                  matching analyzing psychological triggers, urgency indicators,
+                  and social engineering tactics.
+                </p>
               </div>
             </motion.div>
           )}

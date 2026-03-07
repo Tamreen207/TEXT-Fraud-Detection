@@ -1,9 +1,12 @@
 "use client";
 
-import Link from "next/link";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+
+import { detectScamLanguage } from "@/lib/scamLanguageDetector";
+import { createDemoFile, DEMO_IMAGES } from "@/lib/demoImageGenerator";
 import {
   Image as ImageIcon,
   Upload,
@@ -12,6 +15,8 @@ import {
   CheckCircle,
   Loader2,
   FileImage,
+  Search,
+  Languages,
 } from "lucide-react";
 
 interface ImageAnalysisResult {
@@ -55,28 +60,40 @@ interface TextAnalyzeApiResponse {
 const IMAGE_DEMOS = {
   safe: "Screenshot with normal team discussion, order confirmation, or scheduling message.",
   scam: "Screenshot with urgency + account blocked message + OTP/password request + suspicious link.",
+  otp: "Screenshot requesting verification codes and credentials with security alerts.",
+  lottery:
+    "Fake lottery winner notification requesting payment for prize claim.",
+  job: "Work from home scam requiring upfront registration fee payment.",
 };
 
+type DemoPreset = keyof typeof IMAGE_DEMOS;
+
 export default function ImageAnalyzePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string>("");
+  const [selectedDemoPreset, setSelectedDemoPreset] = useState<DemoPreset | "">(
+    "",
+  );
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ImageAnalysisResult | null>(null);
   const [error, setError] = useState("");
+  const [scamLanguageResult, setScamLanguageResult] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const getBackendBaseUrls = (): string[] => {
     const fromEnv = process.env.NEXT_PUBLIC_BACKEND_URL?.trim();
     const fromWindow =
       typeof window !== "undefined"
-        ? `${window.location.protocol}//${window.location.hostname}:8080`
+        ? `${window.location.protocol}//${window.location.hostname}:8000`
         : undefined;
 
     const candidates = [
       fromEnv,
       fromWindow,
-      "http://127.0.0.1:8080",
-      "http://localhost:8080",
+      "http://127.0.0.1:8000",
+      "http://localhost:8000",
     ].filter((value): value is string => Boolean(value));
 
     return [...new Set(candidates)];
@@ -243,7 +260,7 @@ export default function ImageAnalyzePage() {
         message.toLowerCase().includes("network")
       ) {
         setError(
-          "Failed to connect to backend image analyzer. Ensure backend is running on port 8080.",
+          "Failed to connect to backend image analyzer. Ensure backend is running on port 8000.",
         );
       } else {
         setError(
@@ -281,16 +298,48 @@ export default function ImageAnalyzePage() {
 
   const handleGoogleCompare = () => {
     if (!result || !result.extracted_text?.trim()) {
-      setError("Analyze image first to extract text, then verify with Google.");
+      setError("Analyze image first to extract text for Google verification.");
       return;
     }
 
-    // Create Google search query from extracted text
-    const searchQuery = `is this fraud or scam: ${result.extracted_text.substring(0, 200)}`;
-    const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+    // Detect scam language from extracted text
+    const langResult = detectScamLanguage(result.extracted_text);
+    setScamLanguageResult(langResult);
 
-    // Open Google in new tab
-    window.open(googleUrl, "_blank");
+    const searchQuery = `is this message fraud scam phishing: ${result.extracted_text.slice(0, 220)}`;
+    const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`;
+    window.open(googleUrl, "_blank", "noopener,noreferrer");
+  };
+
+  useEffect(() => {
+    const demo = searchParams.get("demo");
+    if (
+      demo === "safe" ||
+      demo === "scam" ||
+      demo === "otp" ||
+      demo === "lottery" ||
+      demo === "job"
+    ) {
+      setSelectedDemoPreset(demo);
+      setResult(null);
+      setError("");
+
+      // Automatically load demo image
+      loadDemoImage(demo);
+    }
+  }, [searchParams]);
+
+  const loadDemoImage = async (demoType: DemoPreset) => {
+    try {
+      setError("");
+      const demoFile = await createDemoFile(demoType);
+      setSelectedFile(demoFile);
+      setPreviewUrl(URL.createObjectURL(demoFile));
+      setSelectedDemoPreset(demoType);
+    } catch (err) {
+      console.error("Failed to load demo image:", err);
+      setError("Failed to generate demo image. Please try again.");
+    }
   };
 
   return (
@@ -307,14 +356,6 @@ export default function ImageAnalyzePage() {
           <p className="text-muted-foreground text-lg">
             Extract text from images and detect fraud using OCR + AI
           </p>
-          <div className="mt-4">
-            <Link
-              href="/analyze/compare?mode=image"
-              className="text-sm text-blue-600 dark:text-blue-400 font-medium hover:underline"
-            >
-              Compare Image Result with Google/Other APIs
-            </Link>
-          </div>
         </div>
 
         {/* Upload Section */}
@@ -322,25 +363,101 @@ export default function ImageAnalyzePage() {
           <div className="space-y-6">
             <div className="rounded-lg border border-border p-4 bg-muted/20">
               <p className="text-sm font-semibold mb-3">
-                Demo Examples (Safe + Scam)
+                📸 Quick Load Demo Images (Click to Try)
               </p>
-              <div className="grid sm:grid-cols-2 gap-3 text-sm">
-                <div className="rounded-md border border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 p-3">
-                  <p className="font-semibold text-green-700 dark:text-green-300 mb-1">
-                    Safe Demo
+              {selectedDemoPreset && (
+                <div className="mb-3 rounded-md border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 p-3">
+                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                    Selected Demo:{" "}
+                    {selectedDemoPreset === "safe"
+                      ? "Safe Screenshot"
+                      : selectedDemoPreset === "scam"
+                        ? "Scam Screenshot"
+                        : "OTP Request Screenshot"}
                   </p>
-                  <p className="text-green-700/90 dark:text-green-300/90">
-                    {IMAGE_DEMOS.safe}
+                  <p className="text-sm text-blue-700/90 dark:text-blue-300/90 mt-1">
+                    {selectedDemoPreset === "safe"
+                      ? IMAGE_DEMOS.safe
+                      : selectedDemoPreset === "scam"
+                        ? IMAGE_DEMOS.scam
+                        : "Screenshot with urgency + account verification + OTP/password request."}
                   </p>
                 </div>
-                <div className="rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 p-3">
-                  <p className="font-semibold text-red-700 dark:text-red-300 mb-1">
-                    Scam Demo
+              )}
+
+              {/* Clickable Demo Buttons */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <button
+                  onClick={() => loadDemoImage("safe")}
+                  className="p-4 rounded-lg border-2 border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 transition-all text-left"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                    <p className="font-semibold text-green-700 dark:text-green-300">
+                      Safe Demo
+                    </p>
+                  </div>
+                  <p className="text-xs text-green-700/90 dark:text-green-300/90">
+                    Normal team chat
                   </p>
-                  <p className="text-red-700/90 dark:text-red-300/90">
-                    {IMAGE_DEMOS.scam}
+                </button>
+
+                <button
+                  onClick={() => loadDemoImage("scam")}
+                  className="p-4 rounded-lg border-2 border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 transition-all text-left"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    <p className="font-semibold text-red-700 dark:text-red-300">
+                      Scam Demo
+                    </p>
+                  </div>
+                  <p className="text-xs text-red-700/90 dark:text-red-300/90">
+                    Urgent bank alert
                   </p>
-                </div>
+                </button>
+
+                <button
+                  onClick={() => loadDemoImage("otp")}
+                  className="p-4 rounded-lg border-2 border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-all text-left"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield className="w-5 h-5 text-orange-600" />
+                    <p className="font-semibold text-orange-700 dark:text-orange-300">
+                      OTP Request
+                    </p>
+                  </div>
+                  <p className="text-xs text-orange-700/90 dark:text-orange-300/90">
+                    Credential theft
+                  </p>
+                </button>
+              </div>
+
+              {/* More demo buttons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  onClick={() => loadDemoImage("lottery")}
+                  className="p-3 rounded-lg border border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 hover:bg-yellow-100 dark:hover:bg-yellow-900/30 transition-all text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileImage className="w-4 h-4 text-yellow-600" />
+                    <p className="font-semibold text-yellow-700 dark:text-yellow-300 text-sm">
+                      Lottery Scam
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => loadDemoImage("job")}
+                  className="p-3 rounded-lg border border-purple-300 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-all text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileImage className="w-4 h-4 text-purple-600" />
+                    <p className="font-semibold text-purple-700 dark:text-purple-300 text-sm">
+                      Fake Job Offer
+                    </p>
+                  </div>
+                </button>
               </div>
             </div>
 
@@ -422,16 +539,59 @@ export default function ImageAnalyzePage() {
                     </>
                   )}
                 </Button>
-                <Link
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleGoogleCompare();
-                  }}
-                  className="sm:w-auto w-full px-6 rounded-lg border-2 border-blue-500 text-blue-600 dark:text-blue-400 font-semibold inline-flex items-center justify-center hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                <Button
+                  onClick={handleGoogleCompare}
+                  disabled={isAnalyzing || !result}
+                  className="flex-1 py-6 text-lg bg-blue-600 hover:bg-blue-700 text-white"
                 >
+                  <Search className="w-5 h-5 mr-2" />
                   Compare with Google
-                </Link>
+                </Button>
+              </div>
+            )}
+
+            {/* Scam Language Detector Result */}
+            {scamLanguageResult && (
+              <div className="p-4 border-2 rounded-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30">
+                <div className="flex items-center gap-2 mb-3">
+                  <Languages className="w-5 h-5 text-purple-600" />
+                  <h3 className="font-semibold text-purple-900 dark:text-purple-100">
+                    🔍 Scam Language Detector
+                  </h3>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="font-medium">Language Score:</span>
+                    <span className="font-bold text-purple-600">
+                      {scamLanguageResult.languageScore}/100
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium">Urgency Level:</span>
+                    <span
+                      className={`font-bold uppercase ${scamLanguageResult.urgencyLevel === "critical" ? "text-red-600" : scamLanguageResult.urgencyLevel === "high" ? "text-orange-600" : scamLanguageResult.urgencyLevel === "medium" ? "text-yellow-600" : "text-green-600"}`}
+                    >
+                      {scamLanguageResult.urgencyLevel}
+                    </span>
+                  </div>
+                  {scamLanguageResult.detectedPatterns.length > 0 && (
+                    <div className="mt-2">
+                      <p className="font-medium mb-1">Detected Patterns:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {scamLanguageResult.detectedPatterns.map(
+                          (pattern: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-xs rounded-full"
+                            >
+                              {pattern}
+                            </span>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -642,6 +802,57 @@ export default function ImageAnalyzePage() {
                     ))}
                   </ul>
                 </Card>
+
+                {/* Unique Features Showcase */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Card className="p-4 border-2 border-green-200 dark:border-green-800 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-green-600 animate-pulse"></div>
+                      <p className="text-xs uppercase tracking-wider text-green-700 dark:text-green-300 font-bold">
+                        OCR Engine
+                      </p>
+                    </div>
+                    <p className="font-semibold text-sm text-green-900 dark:text-green-100">
+                      Text Extraction
+                    </p>
+                    <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                      Advanced OCR extracts text from screenshots for fraud
+                      analysis.
+                    </p>
+                  </Card>
+
+                  <Card className="p-4 border-2 border-blue-200 dark:border-blue-800 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                      <p className="text-xs uppercase tracking-wider text-blue-700 dark:text-blue-300 font-bold">
+                        Image AI
+                      </p>
+                    </div>
+                    <p className="font-semibold text-sm text-blue-900 dark:text-blue-100">
+                      Visual Intelligence
+                    </p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
+                      Multi-modal AI analyzes both image and extracted text
+                      content.
+                    </p>
+                  </Card>
+
+                  <Card className="p-4 border-2 border-orange-200 dark:border-orange-800 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/30 dark:to-orange-900/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 rounded-full bg-orange-600"></div>
+                      <p className="text-xs uppercase tracking-wider text-orange-700 dark:text-orange-300 font-bold">
+                        Pattern ML
+                      </p>
+                    </div>
+                    <p className="font-semibold text-sm text-orange-900 dark:text-orange-100">
+                      Scam Detection
+                    </p>
+                    <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                      Detects phishing, OTP theft, and account scams from
+                      images.
+                    </p>
+                  </Card>
+                </div>
               </>
             ) : (
               <Card className="p-8 border-2 text-center">
